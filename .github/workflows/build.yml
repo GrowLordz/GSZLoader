@@ -10,30 +10,15 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+    - name: Checkout
+      uses: actions/checkout@v4
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
 
-<<<<<<< HEAD
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install Android SDK components
-        env:
-          ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
-        shell: bash
-        run: |
-          set -euxo pipefail
-
-          echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
-
-          mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools"
-=======
     - name: Setup Android SDK
       run: |
         export ANDROID_HOME=$HOME/android-sdk
@@ -51,59 +36,20 @@ jobs:
 
     - name: Build Debug APK
       run: ./gradlew assembleDebug --no-daemon
->>>>>>> 6fd55dd (Fix Android SDK setup - manual install)
 
-          # Some runners install cmdline-tools under a versioned folder like 16.0
-          # Create the expected 'latest' symlink so sdkmanager can be found reliably.
-          if [ ! -d "$ANDROID_SDK_ROOT/cmdline-tools/latest" ]; then
-            if [ -d "$ANDROID_SDK_ROOT/cmdline-tools/16.0" ]; then
-              ln -s "$ANDROID_SDK_ROOT/cmdline-tools/16.0" "$ANDROID_SDK_ROOT/cmdline-tools/latest"
-            fi
-          fi
+    - name: Upload Debug APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: GSZLoader-debug
+        path: app/build/outputs/apk/debug/app-debug.apk
+        retention-days: 7
 
-<<<<<<< HEAD
-          export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH"
-=======
     - name: Build Release APK
       run: ./gradlew assembleRelease --no-daemon
->>>>>>> 6fd55dd (Fix Android SDK setup - manual install)
 
-          # Ensure cmdline-tools is present before installing other SDK packages
-          sdkmanager --sdk_root="$ANDROID_SDK_ROOT" --install "cmdline-tools;latest" || true
-
-          # Accept licenses
-          yes | sdkmanager --sdk_root="$ANDROID_SDK_ROOT" --licenses
-
-          # Install required Android packages
-          sdkmanager --sdk_root="$ANDROID_SDK_ROOT" --install \
-            "platform-tools" \
-            "platforms;android-34" \
-            "build-tools;34.0.0"
-
-      - name: Make gradlew executable
-        run: chmod +x ./gradlew
-
-      - name: Gradle cache
-        uses: gradle/gradle-build-action@v3
-        with:
-          gradle-version: 8.5
-
-      - name: Build Debug
-        run: ./gradlew assembleDebug --no-daemon
-
-      - name: Upload Debug APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: GSZLoader-debug
-          path: app/build/outputs/apk/debug/app-debug.apk
-          retention-days: 7
-
-      - name: Build Release
-        run: ./gradlew assembleRelease --no-daemon
-
-      - name: Upload Release APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: GSZLoader-release
-          path: app/build/outputs/apk/release/app-release-unsigned.apk
-          retention-days: 7
+    - name: Upload Release APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: GSZLoader-release
+        path: app/build/outputs/apk/release/app-release-unsigned.apk
+        retention-days: 7
