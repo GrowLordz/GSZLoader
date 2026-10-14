@@ -16,6 +16,7 @@
     <!-- Menu panel (expand/collapse) -->
     <LinearLayout
         android:id="@+id/menuPanel"
+        android:id="@+id/panelContent"
         android:layout_width="200dp"
         android:layout_height="wrap_content"
         android:layout_marginTop="56dp"
