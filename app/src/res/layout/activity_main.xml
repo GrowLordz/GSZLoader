@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:padding="24dp"
+    android:background="#0D0D1A">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="GSZ LOADER"
+        android:textSize="28sp"
+        android:textStyle="bold"
+        android:textColor="#00D4AA"
+        android:layout_marginBottom="8dp"/>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="PUBG Mod Loader"
+        android:textSize="14sp"
+        android:textColor="#888899"
+        android:layout_marginBottom="32dp"/>
+
+    <TextView
+        android:id="@+id/tvStatus"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Shizuku: CHECKING..."
+        android:textSize="14sp"
+        android:textColor="#FF9800"
+        android:layout_marginBottom="24dp"/>
+
+    <Button
+        android:id="@+id/btnCheckShizuku"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="CHECK SHIZUKU"
+        android:textColor="#FFFFFF"
+        android:background="@drawable/bg_button"
+        android:layout_marginBottom="12dp"/>
+
+    <Button
+        android:id="@+id/btnCopyPaks"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="COPY PAKS TO GAME"
+        android:textColor="#FFFFFF"
+        android:background="@drawable/bg_button"
+        android:layout_marginBottom="12dp"/>
+
+    <Button
+        android:id="@+id/btnLaunchGame"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="LAUNCH GAME"
+        android:textColor="#FFFFFF"
+        android:background="@drawable/bg_button"
+        android:layout_marginBottom="12dp"/>
+
+    <Button
+        android:id="@+id/btnStartMenu"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="START FLOATING MENU"
+        android:textColor="#FFFFFF"
+        android:background="@drawable/bg_button"/>
+
+</LinearLayout>
