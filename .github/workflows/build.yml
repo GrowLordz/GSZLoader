@@ -22,10 +22,21 @@ jobs:
     - name: Android SDK
       uses: android-actions/setup-android@v3
 
-    - name: Install SDK
+    - name: Install SDK and cmdline-tools
+      env:
+        ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
       run: |
-        yes | sdkmanager --licenses > /dev/null
-        sdkmanager "platforms;android-34" "build-tools;34.0.0"
+        if [ -x "${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager" ]; then
+          SDKMANAGER="${ANDROID_SDK_ROOT}/cmdline-tools/latest/bin/sdkmanager"
+        else
+          SDKMANAGER="${ANDROID_SDK_ROOT}/cmdline-tools/16.0/bin/sdkmanager"
+        fi
+
+        echo "Using sdkmanager: $SDKMANAGER"
+
+        yes | "$SDKMANAGER" --sdk_root="${ANDROID_SDK_ROOT}" --install "cmdline-tools;latest" "platform-tools"
+        yes | "$SDKMANAGER" --sdk_root="${ANDROID_SDK_ROOT}" --install "platforms;android-34" "build-tools;34.0.0"
+        yes | "$SDKMANAGER" --sdk_root="${ANDROID_SDK_ROOT}" --licenses
 
     - name: Gradle cache
       uses: gradle/gradle-build-action@v3
