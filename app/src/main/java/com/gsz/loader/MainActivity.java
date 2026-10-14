@@ -20,7 +20,6 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
-import rikka.shizuku.Shizuku;
 
 public class MainActivity extends AppCompatActivity {
 
@@ -68,7 +67,7 @@ public class MainActivity extends AppCompatActivity {
         checkShizukuPermission();
 
         btnCheckShizuku.setOnClickListener(v -> {
-            if (Shizuku.pingBinder()) {
+            if (ShizukuHelper.isBinderAlive()) {
                 bindShizuku();
             } else {
                 tvStatus.setText("Shizuku: NOT RUNNING");
@@ -98,13 +97,13 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void checkShizukuPermission() {
-        if (Shizuku.pingBinder()) {
-            if (Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED) {
+        if (ShizukuHelper.isBinderAlive()) {
+            if (ShizukuHelper.hasPermission() == PackageManager.PERMISSION_GRANTED) {
                 bindShizuku();
             } else if (Shizuku.shouldShowRequestPermissionRationale()) {
                 tvStatus.setText("Shizuku: NEED PERMISSION");
             } else {
-                Shizuku.requestPermission(REQ_PERMISSION);
+                ShizukuHelper.requestPermission(REQ_PERMISSION);
             }
         } else {
             tvStatus.setText("Shizuku: NOT RUNNING");

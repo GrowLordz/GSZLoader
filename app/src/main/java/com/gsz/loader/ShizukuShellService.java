@@ -7,8 +7,6 @@ import android.os.RemoteException;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 
-import rikka.shizuku.Shizuku;
-import rikka.shizuku.ShizukuUserServiceArgs;
 
 public class ShizukuShellService extends IShizukuShell.Stub {
 
