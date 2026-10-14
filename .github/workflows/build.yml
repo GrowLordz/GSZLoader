@@ -25,20 +25,38 @@ jobs:
       - name: Install Android SDK components
         env:
           ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
+        shell: bash
         run: |
+          set -euxo pipefail
+
           echo "ANDROID_SDK_ROOT=$ANDROID_SDK_ROOT"
 
-          # Use the SDK manager that exists after setup-android
+          mkdir -p "$ANDROID_SDK_ROOT/cmdline-tools"
+
+          # Some runners install cmdline-tools under a versioned folder like 16.0
+          # Create the expected 'latest' symlink so sdkmanager can be found reliably.
+          if [ ! -d "$ANDROID_SDK_ROOT/cmdline-tools/latest" ]; then
+            if [ -d "$ANDROID_SDK_ROOT/cmdline-tools/16.0" ]; then
+              ln -s "$ANDROID_SDK_ROOT/cmdline-tools/16.0" "$ANDROID_SDK_ROOT/cmdline-tools/latest"
+            fi
+          fi
+
           export PATH="$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$PATH"
+
+          # Ensure cmdline-tools is present before installing other SDK packages
+          sdkmanager --sdk_root="$ANDROID_SDK_ROOT" --install "cmdline-tools;latest" || true
 
           # Accept licenses
           yes | sdkmanager --sdk_root="$ANDROID_SDK_ROOT" --licenses
 
-          # Install only what's needed for this project
+          # Install required Android packages
           sdkmanager --sdk_root="$ANDROID_SDK_ROOT" --install \
             "platform-tools" \
             "platforms;android-34" \
             "build-tools;34.0.0"
+
+      - name: Make gradlew executable
+        run: chmod +x ./gradlew
 
       - name: Gradle cache
         uses: gradle/gradle-build-action@v3
