@@ -5,6 +5,7 @@ import android.os.Parcel;
 import android.os.RemoteException;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.InputStreamReader;
 
 
@@ -18,7 +19,18 @@ public class ShizukuShellService extends IShizukuShell.Stub {
         try {
             Process process;
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                process = Shizuku.newProcess(new String[]{"sh", "-c", command}, null, null);
+                try {
+                    // Try to call Shizuku.newProcess via reflection so compilation doesn't require the Shizuku API.
+                    Class<?> shizukuClass = Class.forName("moe.shizuku.api.Shizuku");
+                    java.lang.reflect.Method newProcessMethod =
+                            shizukuClass.getMethod("newProcess", String[].class, String[].class, File.class);
+                    Object procObj = newProcessMethod.invoke(null,
+                            new Object[]{new String[]{"sh", "-c", command}, null, null});
+                    process = (Process) procObj;
+                } catch (ClassNotFoundException | NoSuchMethodException e) {
+                    // Shizuku API not present at compile/runtime — fall back to normal exec
+                    process = Runtime.getRuntime().exec(new String[]{"sh", "-c", command});
+                }
             } else {
                 process = Runtime.getRuntime().exec(new String[]{"sh", "-c", command});
             }
