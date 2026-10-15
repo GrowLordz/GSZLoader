@@ -98,11 +98,12 @@ public class MainActivity extends AppCompatActivity {
 
     private void checkShizukuPermission() {
         if (ShizukuHelper.isBinderAlive()) {
-            if (ShizukuHelper.hasPermission() == PackageManager.PERMISSION_GRANTED) {
+            // ShizukuHelper.hasPermission() returns boolean, use it directly
+            if (ShizukuHelper.hasPermission()) {
                 bindShizuku();
-            } else if (Shizuku.shouldShowRequestPermissionRationale()) {
-                tvStatus.setText("Shizuku: NEED PERMISSION");
             } else {
+                // show that permission is needed and request it via helper
+                tvStatus.setText("Shizuku: NEED PERMISSION");
                 ShizukuHelper.requestPermission(REQ_PERMISSION);
             }
         } else {
@@ -113,7 +114,8 @@ public class MainActivity extends AppCompatActivity {
     private void bindShizuku() {
         Intent intent = new Intent(this, ShizukuShellService.class);
         intent.setAction("moe.shizuku.intent.action.USER_SERVICE");
-        Shizuku.bindUserService(intent, shizukuConn);
+        // Use Android's bindService to avoid direct dependency on Shizuku class
+        bindService(intent, shizukuConn, BIND_AUTO_CREATE);
     }
 
     private void copyPaksViaShizuku() {
@@ -176,7 +178,8 @@ public class MainActivity extends AppCompatActivity {
         super.onDestroy();
         if (shizukuBound) {
             try {
-                Shizuku.unbindUserService(shizukuConn);
+                // Use Android's unbindService to avoid direct Shizuku dependency
+                unbindService(shizukuConn);
             } catch (Exception ignored) {}
         }
     }
