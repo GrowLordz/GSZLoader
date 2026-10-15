@@ -8,6 +8,7 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
+import android.content.Context;
 import android.content.Intent;
 import android.graphics.PixelFormat;
 import android.os.Build;
@@ -55,10 +56,15 @@ public class FloatingMenuService extends Service {
     }
 
     private void startForegroundWithNotification() {
-        NotificationChannel channel = new NotificationChannel(
-            CHANNEL_ID, "GSZ Menu", NotificationManager.IMPORTANCE_MIN);
-        NotificationManager nm = getSystemService(NotificationManager.class);
-        nm.createNotificationChannel(channel);
+        // NotificationChannel is available on API 26+. Guard usage to avoid NoClassDefFoundError
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel channel = new NotificationChannel(
+                CHANNEL_ID, "GSZ Menu", NotificationManager.IMPORTANCE_MIN);
+            NotificationManager nm = (NotificationManager) getSystemService(NotificationManager.class);
+            if (nm != null) {
+                nm.createNotificationChannel(channel);
+            }
+        }
 
         Intent intent = new Intent(this, MainActivity.class);
         PendingIntent pi = PendingIntent.getActivity(
