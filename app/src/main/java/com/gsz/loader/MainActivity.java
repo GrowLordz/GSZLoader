@@ -9,7 +9,6 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.IBinder;
-import android.os.RemoteException;
 import android.provider.Settings;
 import android.view.View;
 import android.widget.Button;
@@ -20,11 +19,11 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
-
 public class MainActivity extends AppCompatActivity {
 
-    private static final int REQ_PERMISSION = 1001;
+    private static final int REQ_SHIZUKU = 1001;
     private static final int REQ_OVERLAY = 1002;
+    private static final int REQ_STORAGE = 1003;
 
     private TextView tvStatus;
     private Button btnStartMenu, btnCopyPaks, btnLaunchGame, btnCheckShizuku;
@@ -37,8 +36,10 @@ public class MainActivity extends AppCompatActivity {
             shellService = IShizukuShell.Stub.asInterface(service);
             shizukuBound = true;
             runOnUiThread(() -> {
-                tvStatus.setText("Shizuku: CONNECTED");
-                tvStatus.setTextColor(0xFF4CAF50);
+                if (tvStatus != null) {
+                    tvStatus.setText("Shizuku: CONNECTED");
+                    tvStatus.setTextColor(0xFF4CAF50);
+                }
             });
         }
 
@@ -47,8 +48,10 @@ public class MainActivity extends AppCompatActivity {
             shizukuBound = false;
             shellService = null;
             runOnUiThread(() -> {
-                tvStatus.setText("Shizuku: DISCONNECTED");
-                tvStatus.setTextColor(0xFFF44336);
+                if (tvStatus != null) {
+                    tvStatus.setText("Shizuku: DISCONNECTED");
+                    tvStatus.setTextColor(0xFFF44336);
+                }
             });
         }
     };
@@ -64,14 +67,17 @@ public class MainActivity extends AppCompatActivity {
         btnLaunchGame = findViewById(R.id.btnLaunchGame);
         btnCheckShizuku = findViewById(R.id.btnCheckShizuku);
 
+        ensureStoragePermission();
         checkShizukuPermission();
 
         btnCheckShizuku.setOnClickListener(v -> {
             if (ShizukuHelper.isBinderAlive()) {
                 bindShizuku();
             } else {
-                tvStatus.setText("Shizuku: NOT RUNNING");
-                tvStatus.setTextColor(0xFFFF9800);
+                if (tvStatus != null) {
+                    tvStatus.setText("Shizuku: NOT RUNNING");
+                    tvStatus.setTextColor(0xFFFF9800);
+                }
                 Toast.makeText(this, "Start Shizuku first!", Toast.LENGTH_LONG).show();
             }
         });
@@ -96,29 +102,62 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+    private void ensureStoragePermission() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+            return;
+        }
+        String[] perms = new String[] {
+                Manifest.permission.READ_EXTERNAL_STORAGE,
+                Manifest.permission.WRITE_EXTERNAL_STORAGE
+        };
+        boolean need = false;
+        for (String perm : perms) {
+            if (ContextCompat.checkSelfPermission(this, perm) != PackageManager.PERMISSION_GRANTED) {
+                need = true;
+                break;
+            }
+        }
+        if (need) {
+            ActivityCompat.requestPermissions(this, perms, REQ_STORAGE);
+        }
+    }
+
     private void checkShizukuPermission() {
         if (ShizukuHelper.isBinderAlive()) {
-            // ShizukuHelper.hasPermission() returns boolean, use it directly
             if (ShizukuHelper.hasPermission()) {
                 bindShizuku();
             } else {
-                // show that permission is needed and request it via helper
-                tvStatus.setText("Shizuku: NEED PERMISSION");
-                ShizukuHelper.requestPermission(REQ_PERMISSION);
+                if (tvStatus != null) {
+                    tvStatus.setText("Shizuku: NEED PERMISSION");
+                }
+                ShizukuHelper.requestPermission(REQ_SHIZUKU);
             }
         } else {
-            tvStatus.setText("Shizuku: NOT RUNNING");
+            if (tvStatus != null) {
+                tvStatus.setText("Shizuku: NOT RUNNING");
+            }
         }
     }
 
     private void bindShizuku() {
-        Intent intent = new Intent(this, ShizukuShellService.class);
-        intent.setAction("moe.shizuku.intent.action.USER_SERVICE");
-        // Use Android's bindService to avoid direct dependency on Shizuku class
-        bindService(intent, shizukuConn, BIND_AUTO_CREATE);
+        try {
+            Intent intent = new Intent(this, ShizukuShellService.class);
+            intent.setAction("moe.shizuku.intent.action.USER_SERVICE");
+            bindService(intent, shizukuConn, BIND_AUTO_CREATE);
+        } catch (Throwable t) {
+            Toast.makeText(this, "Failed to bind Shizuku service", Toast.LENGTH_LONG).show();
+        }
     }
 
     private void copyPaksViaShizuku() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M &&
+                ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
+                        != PackageManager.PERMISSION_GRANTED) {
+            ensureStoragePermission();
+            Toast.makeText(this, "Storage permission required to copy PAK files.", Toast.LENGTH_LONG).show();
+            return;
+        }
+
         if (!shizukuBound || shellService == null) {
             Toast.makeText(this, "Shizuku not connected!", Toast.LENGTH_SHORT).show();
             return;
@@ -145,13 +184,17 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void startFloatingMenu() {
-        Intent intent = new Intent(this, FloatingMenuService.class);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(intent);
-        } else {
-            startService(intent);
+        try {
+            Intent intent = new Intent(this, FloatingMenuService.class);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(intent);
+            } else {
+                startService(intent);
+            }
+            Toast.makeText(this, "Floating menu started!", Toast.LENGTH_SHORT).show();
+        } catch (Throwable t) {
+            Toast.makeText(this, "Failed to start floating menu: " + t.getMessage(), Toast.LENGTH_LONG).show();
         }
-        Toast.makeText(this, "Floating menu started!", Toast.LENGTH_SHORT).show();
     }
 
     @Override
@@ -167,9 +210,20 @@ public class MainActivity extends AppCompatActivity {
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == REQ_PERMISSION && grantResults.length > 0
+        if (requestCode == REQ_SHIZUKU && grantResults.length > 0
                 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
             bindShizuku();
+        } else if (requestCode == REQ_STORAGE && grantResults.length > 0) {
+            boolean granted = true;
+            for (int result : grantResults) {
+                if (result != PackageManager.PERMISSION_GRANTED) {
+                    granted = false;
+                    break;
+                }
+            }
+            if (granted && ShizukuHelper.isBinderAlive()) {
+                bindShizuku();
+            }
         }
     }
 
@@ -178,7 +232,6 @@ public class MainActivity extends AppCompatActivity {
         super.onDestroy();
         if (shizukuBound) {
             try {
-                // Use Android's unbindService to avoid direct Shizuku dependency
                 unbindService(shizukuConn);
             } catch (Exception ignored) {}
         }
