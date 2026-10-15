@@ -1,132 +1,72 @@
 package com.gsz.loader;
 
 import android.content.Context;
-import android.content.pm.PackageManager;
+import android.content.res.AssetManager;
 import android.util.Log;
 
-import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.InputStream;
-import java.io.OutputStream;
-import java.lang.reflect.Method;
-import java.nio.charset.StandardCharsets;
 
-public final class ShizukuHelper {
+public class PakManager {
 
-    private static final String TAG = "ShizukuHelper";
-    private static Object shizukuBinder = null;
-    private static Class<?> shizukuClass = null;
+    private static final String PAK_DIR = "paks";
+    private static final String TAG = "PakManager";
 
-    static {
-        try {
-            shizukuClass = Class.forName("rikka.shizuku.Shizuku");
-        } catch (Throwable ignored) {}
-    }
+    public static void copyPaks(Context ctx, IShizukuShell shell, String gamePkg) throws Exception {
+        AssetManager am = ctx.getAssets();
+        String[] files = am.list(PAK_DIR);
+        if (files == null || files.length == 0) return;
 
-    private ShizukuHelper() {}
-
-    public static boolean isBinderAlive() {
-        try {
-            if (shizukuClass == null) return false;
-            Method m = shizukuClass.getMethod("pingBinder");
-            return (boolean) m.invoke(null);
-        } catch (Throwable t) {
-            return false;
-        }
-    }
-
-    public static boolean hasPermission() {
-        try {
-            if (!isBinderAlive()) return false;
-            Method m = shizukuClass.getMethod("checkSelfPermission");
-            int result = (int) m.invoke(null);
-            return result == PackageManager.PERMISSION_GRANTED;
-        } catch (Throwable t) {
-            return false;
-        }
-    }
-
-    public static void requestPermission(int reqCode) {
-        try {
-            Method m = shizukuClass.getMethod("requestPermission", int.class);
-            m.invoke(null, reqCode);
-        } catch (Throwable t) {
-            Log.e(TAG, "requestPermission failed", t);
-        }
-    }
-
-    private static Process shizukuNewProcess(String[] cmd) throws Exception {
-        Method m = shizukuClass.getDeclaredMethod("newProcess", String[].class, String[].class, String.class);
-        m.setAccessible(true);
-        return (Process) m.invoke(null, cmd, null, null);
-    }
-
-    public static boolean writeFileAsShell(String absPath, String content) {
-        if (!isBinderAlive() || !hasPermission()) return false;
-        try {
-            String parent = new File(absPath).getParent();
-            if (parent != null) {
-                Process mk = shizukuNewProcess(new String[]{"sh", "-c", "mkdir -p '" + parent + "'"});
-                mk.waitFor();
-                mk.destroy();
+        File internalDir = new File(ctx.getFilesDir(), "paks");
+        if (!internalDir.exists()) {
+            boolean created = internalDir.mkdirs();
+            if (!created && !internalDir.exists()) {
+                throw new IllegalStateException("Could not create internal paks directory");
             }
-            Process p = shizukuNewProcess(new String[]{"sh", "-c", "cat > '" + absPath + "' && chmod 644 '" + absPath + "'"});
-            OutputStream os = p.getOutputStream();
-            os.write(content.getBytes(StandardCharsets.UTF_8));
-            os.flush();
-            os.close();
-            int code = p.waitFor();
-            p.destroy();
-            return code == 0;
-        } catch (Throwable t) {
-            Log.e(TAG, "writeFileAsShell failed", t);
-            return false;
         }
-    }
 
-    public static String readFileAsShell(String absPath) {
-        if (!isBinderAlive() || !hasPermission()) return null;
-        try {
-            Process p = shizukuNewProcess(new String[]{"sh", "-c", "cat '" + absPath + "' 2>/dev/null"});
-            InputStream is = p.getInputStream();
-            ByteArrayOutputStream bos = new ByteArrayOutputStream();
-            byte[] buf = new byte[8192];
-            int n;
-            while ((n = is.read(buf)) > 0) bos.write(buf, 0, n);
-            is.close();
-            p.waitFor();
-            p.destroy();
-            String out = bos.toString(StandardCharsets.UTF_8);
-            return out.isEmpty() ? null : out;
-        } catch (Throwable t) {
-            return null;
+        for (String f : files) {
+            if (f == null || !f.endsWith(".pak")) continue;
+            File out = new File(internalDir, f);
+            if (out.exists()) continue;
+
+            try (InputStream is = am.open(PAK_DIR + "/" + f);
+                 FileOutputStream fos = new FileOutputStream(out)) {
+                byte[] buf = new byte[8192];
+                int len;
+                while ((len = is.read(buf)) > 0) {
+                    fos.write(buf, 0, len);
+                }
+            }
         }
-    }
 
-    public static boolean copyFileAsShell(String src, String dst) {
-        if (!isBinderAlive() || !hasPermission()) return false;
-        try {
-            Process p = shizukuNewProcess(new String[]{"sh", "-c", "cp '" + src + "' '" + dst + "' && chmod 644 '" + dst + "'"});
-            int code = p.waitFor();
-            p.destroy();
-            return code == 0;
-        } catch (Throwable t) {
-            return false;
+        String gamePakDir = "/sdcard/Android/data/" + gamePkg
+            + "/files/UE4Game/ShadowTrackerExtra/ShadowTrackerExtra/Saved/Paks/";
+
+        shell.exec("mkdir -p " + gamePakDir);
+
+        File[] localFiles = internalDir.listFiles();
+        if (localFiles != null) {
+            for (File f : localFiles) {
+                if (f == null || !f.getName().endsWith(".pak")) continue;
+                try {
+                    shell.exec("cp " + f.getAbsolutePath() + " " + gamePakDir + f.getName());
+                    shell.exec("chmod 644 " + gamePakDir + f.getName());
+                } catch (Exception e) {
+                    Log.e(TAG, "Failed to copy pak: " + f.getName(), e);
+                }
+            }
         }
-    }
 
-    public static String detectInstalledGame(Context ctx) {
-        PackageManager pm = ctx.getPackageManager();
-        String[] pkgs = {
-            "com.pubg.imobile", "com.tencent.ig", "com.tencent.igfit",
-            "com.pubg.krmobile", "com.vng.pubgmobile", "com.rekoo.pubgm"
-        };
-        for (String pkg : pkgs) {
+        File cfg = new File(ctx.getFilesDir(), "grow_settings.txt");
+        if (cfg.exists()) {
             try {
-                pm.getPackageInfo(pkg, 0);
-                return pkg;
-            } catch (PackageManager.NameNotFoundException ignored) {}
+                shell.exec("cp " + cfg.getAbsolutePath() + " " + gamePakDir + "grow_settings.txt");
+                shell.exec("chmod 644 " + gamePakDir + "grow_settings.txt");
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to copy config", e);
+            }
         }
-        return null;
     }
 }

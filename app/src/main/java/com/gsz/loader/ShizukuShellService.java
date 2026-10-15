@@ -1,107 +1,166 @@
 package com.gsz.loader;
 
-import android.app.Service;
-import android.content.Intent;
-import android.os.Build;
-import android.os.IBinder;
-import android.os.Parcel;
-import android.os.RemoteException;
-import androidx.annotation.Nullable;
+import android.content.Context;
+import android.content.pm.PackageManager;
+import android.util.Log;
 
-import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.InputStreamReader;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.lang.reflect.Method;
+import java.nio.charset.StandardCharsets;
 
-/**
- * Adapter Service that exposes IShizukuShell AIDL via a proper android.app.Service.
- * The previous implementation was a Binder implementation but did not extend Service,
- * which caused Lint (Instantiatable) to fail for release builds. This Service returns
- * an IShizukuShell.Stub binder that delegates to the existing exec implementation.
- */
-public class ShizukuShellService extends Service {
+public final class ShizukuHelper {
 
-    private final IShizukuShell.Stub binder = new IShizukuShell.Stub() {
-        @Override
-        public String exec(String command) throws RemoteException {
-            StringBuilder output = new StringBuilder();
+    private static final String TAG = "ShizukuHelper";
+    private static Class<?> shizukuClass = null;
+
+    static {
+        String[] candidates = new String[] {
+                "moe.shizuku.api.Shizuku",
+                "moe.shizuku.Shizuku",
+                "rikka.shizuku.Shizuku"
+        };
+        for (String c : candidates) {
             try {
-                Process process;
+                shizukuClass = Class.forName(c);
+                break;
+            } catch (Throwable ignored) {}
+        }
+    }
 
-                // Try to use Shizuku's newProcess via reflection when available; fall back to Runtime.exec().
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    try {
-                        Class<?> shizukuClass = null;
-                        // Try several known Shizuku class names to be robust across versions
-                        String[] candidates = new String[]{
-                                "moe.shizuku.api.Shizuku",
-                                "moe.shizuku.Shizuku",
-                                "rikka.shizuku.Shizuku"
-                        };
-                        for (String c : candidates) {
-                            try {
-                                shizukuClass = Class.forName(c);
-                                break;
-                            } catch (ClassNotFoundException ignored) {}
-                        }
+    private ShizukuHelper() {}
 
-                        if (shizukuClass != null) {
-                            java.lang.reflect.Method newProcessMethod = null;
-                            try {
-                                newProcessMethod = shizukuClass.getMethod("newProcess", String[].class, String[].class, File.class);
-                            } catch (NoSuchMethodException ignored) {
-                                // try alternate signature used in other versions
-                                newProcessMethod = shizukuClass.getMethod("newProcess", String[].class, String[].class, String.class);
-                            }
-
-                            Object procObj = newProcessMethod.invoke(null,
-                                    new Object[]{new String[]{"sh", "-c", command}, null, null});
-                            process = (Process) procObj;
-                        } else {
-                            process = Runtime.getRuntime().exec(new String[]{"sh", "-c", command});
-                        }
-                    } catch (Throwable t) {
-                        // If anything goes wrong with reflection/use of Shizuku, fall back to Runtime.exec
-                        process = Runtime.getRuntime().exec(new String[]{"sh", "-c", command});
-                    }
-                } else {
-                    process = Runtime.getRuntime().exec(new String[]{"sh", "-c", command});
+    public static boolean isBinderAlive() {
+        if (shizukuClass == null) return false;
+        for (String methodName : new String[]{"pingBinder", "isBinderAlive"}) {
+            try {
+                Method m = shizukuClass.getMethod(methodName);
+                Object result = m.invoke(null);
+                if (result instanceof Boolean) {
+                    return (Boolean) result;
                 }
+            } catch (Throwable ignored) {}
+        }
+        return false;
+    }
 
-                BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-                BufferedReader errReader = new BufferedReader(new InputStreamReader(process.getErrorStream()));
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    output.append(line).append("\n");
-                }
-                while ((line = errReader.readLine()) != null) {
-                    output.append("ERR: ").append(line).append("\n");
-                }
-                process.waitFor();
-            } catch (Exception e) {
-                output.append("EXCEPTION: ").append(e.getMessage());
+    public static boolean hasPermission() {
+        if (shizukuClass == null || !isBinderAlive()) return false;
+        try {
+            Method m = shizukuClass.getMethod("checkSelfPermission");
+            Object result = m.invoke(null);
+            if (result instanceof Integer) {
+                return ((Integer) result) == PackageManager.PERMISSION_GRANTED;
             }
-            return output.toString();
+        } catch (Throwable ignored) {}
+        return false;
+    }
+
+    public static void requestPermission(int reqCode) {
+        if (shizukuClass == null) return;
+        try {
+            Method m = shizukuClass.getMethod("requestPermission", int.class);
+            m.invoke(null, reqCode);
+        } catch (Throwable t) {
+            Log.e(TAG, "requestPermission failed", t);
+        }
+    }
+
+    private static Process shizukuNewProcess(String[] cmd) throws Exception {
+        if (shizukuClass == null) {
+            throw new IllegalStateException("Shizuku not available");
         }
 
-        @Override
-        public boolean onTransact(int code, Parcel data, Parcel reply, int flags) throws RemoteException {
-            return super.onTransact(code, data, reply, flags);
+        Method m = null;
+        Class<?>[][] signatures = new Class<?>[][] {
+                {String[].class, String[].class, String.class},
+                {String[].class, String[].class, File.class},
+                {String[].class, String[].class, String[].class}
+        };
+
+        for (Class<?>[] signature : signatures) {
+            try {
+                m = shizukuClass.getDeclaredMethod("newProcess", signature);
+                break;
+            } catch (NoSuchMethodException ignored) {}
         }
-    };
 
-    @Nullable
-    @Override
-    public IBinder onBind(Intent intent) {
-        return binder;
+        if (m == null) {
+            throw new NoSuchMethodException("newProcess");
+        }
+
+        m.setAccessible(true);
+        return (Process) m.invoke(null, cmd, null, null);
     }
 
-    @Override
-    public void onCreate() {
-        super.onCreate();
+    public static boolean writeFileAsShell(String absPath, String content) {
+        if (!isBinderAlive() || !hasPermission()) return false;
+        try {
+            String parent = new File(absPath).getParent();
+            if (parent != null) {
+                Process mk = shizukuNewProcess(new String[]{"sh", "-c", "mkdir -p '" + parent + "'"});
+                mk.waitFor();
+                mk.destroy();
+            }
+            Process p = shizukuNewProcess(new String[]{"sh", "-c", "cat > '" + absPath + "' && chmod 644 '" + absPath + "'"});
+            OutputStream os = p.getOutputStream();
+            os.write(content.getBytes(StandardCharsets.UTF_8));
+            os.flush();
+            os.close();
+            int code = p.waitFor();
+            p.destroy();
+            return code == 0;
+        } catch (Throwable t) {
+            Log.e(TAG, "writeFileAsShell failed", t);
+            return false;
+        }
     }
 
-    @Override
-    public void onDestroy() {
-        super.onDestroy();
+    public static String readFileAsShell(String absPath) {
+        if (!isBinderAlive() || !hasPermission()) return null;
+        try {
+            Process p = shizukuNewProcess(new String[]{"sh", "-c", "cat '" + absPath + "' 2>/dev/null"});
+            InputStream is = p.getInputStream();
+            ByteArrayOutputStream bos = new ByteArrayOutputStream();
+            byte[] buf = new byte[8192];
+            int n;
+            while ((n = is.read(buf)) > 0) bos.write(buf, 0, n);
+            is.close();
+            p.waitFor();
+            p.destroy();
+            String out = bos.toString(StandardCharsets.UTF_8);
+            return out.isEmpty() ? null : out;
+        } catch (Throwable t) {
+            return null;
+        }
     }
-};
+
+    public static boolean copyFileAsShell(String src, String dst) {
+        if (!isBinderAlive() || !hasPermission()) return false;
+        try {
+            Process p = shizukuNewProcess(new String[]{"sh", "-c", "cp '" + src + "' '" + dst + "' && chmod 644 '" + dst + "'"});
+            int code = p.waitFor();
+            p.destroy();
+            return code == 0;
+        } catch (Throwable t) {
+            return false;
+        }
+    }
+
+    public static String detectInstalledGame(Context ctx) {
+        PackageManager pm = ctx.getPackageManager();
+        String[] pkgs = {
+            "com.pubg.imobile", "com.tencent.ig", "com.tencent.igfit",
+            "com.pubg.krmobile", "com.vng.pubgmobile", "com.rekoo.pubgm"
+        };
+        for (String pkg : pkgs) {
+            try {
+                pm.getPackageInfo(pkg, 0);
+                return pkg;
+            } catch (PackageManager.NameNotFoundException ignored) {}
+        }
+        return null;
+    }
+}
