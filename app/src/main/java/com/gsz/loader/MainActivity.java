@@ -20,6 +20,24 @@ import android.widget.Toast;
 public class MainActivity extends AppCompatActivity {
 
     private static final String TAG = "MainActivity";
+    
+    private final Shizuku.OnRequestPermissionResultListener permListener = (requestCode, grantResult) -> {
+        if (requestCode == REQ_PERMISSION) {
+            runOnUiThread(() -> {
+                if (grantResult == PackageManager.PERMISSION_GRANTED) {
+                    tvAccessMode.setText("Access: SHIZUKU");
+                    tvAccessMode.setTextColor(0xFF4CAF50);
+                    tvStatus.setText("Shizuku connected");
+                    tvStatus.setTextColor(0xFF4CAF50);
+                    Toast.makeText(this, "Shizuku permission granted!", Toast.LENGTH_SHORT).show();
+                } else {
+                    tvStatus.setText("Shizuku permission denied");
+                    tvStatus.setTextColor(0xFFF44336);
+                    showPermissionDeniedDialog();
+                }
+            });
+        }
+    };
     private static final int REQ_PERMISSION = 1001;
     private static final int REQ_OVERLAY = 1002;
 
@@ -36,6 +54,9 @@ public class MainActivity extends AppCompatActivity {
 
         config = new ConfigManager(this);
         handler = new Handler(Looper.getMainLooper());
+
+        // Register Shizuku permission listener
+        Shizuku.addRequestPermissionResultListener(permListener);
 
         initViews();
         checkAccess();
@@ -151,6 +172,34 @@ public class MainActivity extends AppCompatActivity {
         }
 
         Log.d(TAG, "=== checkAccess finished ===");
+    }
+
+    private void showPermissionDeniedDialog() {
+        new AlertDialog.Builder(this)
+                .setTitle("Permission Required")
+                .setMessage("GSZ Loader needs Shizuku permission to work.\n\n" +
+                        "Please grant permission in Shizuku app:\n" +
+                        "1. Open Shizuku\n" +
+                        "2. Go to 'Authorized applications'\n" +
+                        "3. Find GSZ Loader and enable it")
+                .setPositiveButton("OPEN SHIZUKU", (d, w) -> {
+                    try {
+                        Intent intent = getPackageManager().getLaunchIntentForPackage("moe.shizuku.privileged.api");
+                        if (intent != null) {
+                            startActivity(intent);
+                        }
+                    } catch (Exception e) {
+                        Toast.makeText(this, "Shizuku not found", Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .setNegativeButton("RETRY", (d, w) -> checkAccess())
+                .setNeutralButton("FORCE CONTINUE", (d, w) -> {
+                    tvAccessMode.setText("Access: FORCED");
+                    tvAccessMode.setTextColor(0xFFFF9800);
+                    tvStatus.setText("Forced mode - may not work");
+                    tvStatus.setTextColor(0xFFFF9800);
+                })
+                .show();
     }
 
     private void showShizukuInstallDialog() {
@@ -294,6 +343,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
+        Shizuku.removeRequestPermissionResultListener(permListener);
         Log.d(TAG, "MainActivity destroyed");
     }
 }

@@ -316,21 +316,34 @@ public final class ShizukuHelper {
     }
 
     public static String getGamePakDir(String gamePkg) {
-        String[] paths = {
+        // Primary path based on user feedback
+        String primaryPath = "/storage/emulated/0/Android/data/" + gamePkg 
+            + "/files/UE4Game/ShadowTrackerExtra/ShadowTrackerExtra/Saved/Paks/";
+        
+        // Check if primary path exists
+        String check = exec("test -d '" + primaryPath + "' && echo EXISTS || echo NOT_FOUND");
+        if (check.contains("EXISTS")) {
+            Log.d(TAG, "Found pak dir: " + primaryPath);
+            return primaryPath;
+        }
+        
+        // Fallback paths
+        String[] fallbackPaths = {
             "/sdcard/Android/data/" + gamePkg + "/files/UE4Game/ShadowTrackerExtra/ShadowTrackerExtra/Saved/Paks/",
-            "/storage/emulated/0/Android/data/" + gamePkg + "/files/UE4Game/ShadowTrackerExtra/ShadowTrackerExtra/Saved/Paks/",
             "/sdcard/Android/data/" + gamePkg + "/files/UE4Game/ShadowTrackerExtra/Saved/Paks/",
         };
         
-        for (String path : paths) {
-            String check = exec("test -d '" + path + "' && echo EXISTS || echo NOT_FOUND");
+        for (String path : fallbackPaths) {
+            check = exec("test -d '" + path + "' && echo EXISTS || echo NOT_FOUND");
             if (check.contains("EXISTS")) {
-                Log.d(TAG, "Found pak dir: " + path);
+                Log.d(TAG, "Found pak dir (fallback): " + path);
                 return path;
             }
         }
         
-        return paths[0];
+        // Return primary path even if not exists (will be created)
+        Log.d(TAG, "Using primary path (will create): " + primaryPath);
+        return primaryPath;
     }
 
     public static String getGameSaveDir(String gamePkg) {

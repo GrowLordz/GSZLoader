@@ -42,6 +42,7 @@ public class FloatingMenuService extends Service {
     private LinearLayout panelContent;
     private View espRow, aimbotRow;
     private View espIndicator, aimbotIndicator;
+    private ImageView btnClose;
 
     private boolean menuExpanded = false;
     private ConfigManager config;
