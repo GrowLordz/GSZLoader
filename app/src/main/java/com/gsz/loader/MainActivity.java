@@ -7,6 +7,7 @@ import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import rikka.shizuku.Shizuku;
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.Settings;
@@ -29,6 +30,7 @@ public class MainActivity extends AppCompatActivity {
     private ProgressBar progressBar;
     private ConfigManager config;
     private Handler handler;
+    private Shizuku.OnRequestPermissionResultListener permListener;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
