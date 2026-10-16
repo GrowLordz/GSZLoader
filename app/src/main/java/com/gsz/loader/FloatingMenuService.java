@@ -2,6 +2,7 @@ package com.gsz.loader;
 
 import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
+import androidx.core.app.NotificationCompat;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
@@ -89,9 +90,9 @@ public class FloatingMenuService extends Service {
 
             Notification.Builder builder;
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                builder = new Notification.Builder(this, CHANNEL_ID);
+                builder = new NotificationCompat.Builder(this, CHANNEL_ID);
             } else {
-                builder = new Notification.Builder(this);
+                builder = new NotificationCompat.Builder(this);
             }
 
             Notification notif = builder

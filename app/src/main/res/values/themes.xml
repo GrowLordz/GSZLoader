@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.GSZLoader" parent="android:Theme.Material.NoActionBar">
+    <style name="Theme.GSZLoader" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="colorPrimary">#00D4AA</item>
+        <item name="colorPrimaryVariant">#00D4AA</item>
+        <item name="colorOnPrimary">#000000</item>
         <item name="android:statusBarColor">#0D0D1A</item>
         <item name="android:navigationBarColor">#0D0D1A</item>
         <item name="android:windowBackground">#0D0D1A</item>
