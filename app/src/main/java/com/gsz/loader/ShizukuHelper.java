@@ -291,12 +291,34 @@ public final class ShizukuHelper {
     }
 
     public static String getGamePakDir(String gamePkg) {
-        return "/sdcard/Android/data/" + gamePkg
-                + "/files/UE4Game/ShadowTrackerExtra/ShadowTrackerExtra/Saved/Paks/";
+        String[] paths = {
+            "/sdcard/Android/data/" + gamePkg + "/files/UE4Game/ShadowTrackerExtra/ShadowTrackerExtra/Saved/Paks/",
+            "/storage/emulated/0/Android/data/" + gamePkg + "/files/UE4Game/ShadowTrackerExtra/ShadowTrackerExtra/Saved/Paks/",
+            "/sdcard/Android/data/" + gamePkg + "/files/UE4Game/ShadowTrackerExtra/Saved/Paks/",
+        };
+        
+        for (String path : paths) {
+            String check = exec("test -d '" + path + "' && echo EXISTS || echo NOT_FOUND");
+            if (check.contains("EXISTS")) {
+                Log.d(TAG, "Found pak dir: " + path);
+                return path;
+            }
+        }
+        
+        return paths[0];
     }
 
     public static String getGameSaveDir(String gamePkg) {
         return "/sdcard/Android/data/" + gamePkg
                 + "/files/UE4Game/ShadowTrackerExtra/ShadowTrackerExtra/Saved/SaveGames/";
+    }
+
+    public static boolean fileExists(String path) {
+        String result = exec("test -f '" + path + "' && echo EXISTS || echo NOT_FOUND");
+        return result.contains("EXISTS");
+    }
+
+    public static String getFileSize(String path) {
+        return exec("stat -c %s '" + path + "' 2>/dev/null || echo 0");
     }
 }
