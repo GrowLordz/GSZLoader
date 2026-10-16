@@ -1,13 +1,12 @@
 package com.gsz.loader;
 
-import androidx.appcompat.app.AppCompatActivity;
+import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import rikka.shizuku.Shizuku;
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.Settings;
@@ -18,10 +17,11 @@ import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
 
-public class MainActivity extends AppCompatActivity {
+import rikka.shizuku.Shizuku;
+
+public class MainActivity extends Activity {
 
     private static final String TAG = "MainActivity";
-    
     private static final int REQ_PERMISSION = 1001;
     private static final int REQ_OVERLAY = 1002;
 
@@ -35,201 +35,317 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
+        
+        try {
+            setContentView(R.layout.activity_main);
+        } catch (Exception e) {
+            Log.e(TAG, "setContentView failed", e);
+            Toast.makeText(this, "Layout error: " + e.getMessage(), Toast.LENGTH_LONG).show();
+            finish();
+            return;
+        }
 
         config = new ConfigManager(this);
         handler = new Handler(Looper.getMainLooper());
 
-        // Initialize Shizuku permission listener
-        permListener = (requestCode, grantResult) -> {
-            if (requestCode == REQ_PERMISSION) {
-                runOnUiThread(() -> {
-                    if (grantResult == PackageManager.PERMISSION_GRANTED) {
-                        tvAccessMode.setText("Access: SHIZUKU");
-                        tvAccessMode.setTextColor(0xFF4CAF50);
-                        tvStatus.setText("Shizuku connected");
-                        tvStatus.setTextColor(0xFF4CAF50);
-                        Toast.makeText(this, "Shizuku permission granted!", Toast.LENGTH_SHORT).show();
-                    } else {
-                        tvStatus.setText("Shizuku permission denied");
-                        tvStatus.setTextColor(0xFFF44336);
-                        showPermissionDeniedDialog();
-                    }
-                });
-            }
-        };
-        // Register Shizuku permission listener
-        Shizuku.addRequestPermissionResultListener(permListener);
-
         initViews();
+
+        try {
+            permListener = (requestCode, grantResult) -> {
+                if (requestCode == REQ_PERMISSION) {
+                    runOnUiThread(() -> {
+                        try {
+                            if (grantResult == PackageManager.PERMISSION_GRANTED) {
+                                tvAccessMode.setText("Access: SHIZUKU");
+                                tvAccessMode.setTextColor(0xFF4CAF50);
+                                tvStatus.setText("Shizuku connected");
+                                tvStatus.setTextColor(0xFF4CAF50);
+                                Toast.makeText(MainActivity.this, "Shizuku permission granted!", Toast.LENGTH_SHORT).show();
+                            } else {
+                                tvStatus.setText("Shizuku permission denied");
+                                tvStatus.setTextColor(0xFFF44336);
+                                showPermissionDeniedDialog();
+                            }
+                        } catch (Exception e) {
+                            Log.e(TAG, "Permission callback error", e);
+                        }
+                    });
+                }
+            };
+            
+            try {
+                Shizuku.addRequestPermissionResultListener(permListener);
+            } catch (Throwable t) {
+                Log.e(TAG, "Failed to register Shizuku listener", t);
+            }
+        } catch (Throwable t) {
+            Log.e(TAG, "Failed to create permission listener", t);
+        }
+
         checkAccess();
     }
 
     private void initViews() {
-        tvStatus = findViewById(R.id.tvStatus);
-        tvGamePkg = findViewById(R.id.tvGamePkg);
-        tvAccessMode = findViewById(R.id.tvAccessMode);
-        btnStartMenu = findViewById(R.id.btnStartMenu);
-        btnCopyPaks = findViewById(R.id.btnCopyPaks);
-        btnLaunchGame = findViewById(R.id.btnLaunchGame);
-        btnKillGame = findViewById(R.id.btnKillGame);
-        btnCheckAccess = findViewById(R.id.btnCheckAccess);
-        progressBar = findViewById(R.id.progressBar);
+        try {
+            tvStatus = findViewById(R.id.tvStatus);
+            tvGamePkg = findViewById(R.id.tvGamePkg);
+            tvAccessMode = findViewById(R.id.tvAccessMode);
+            btnStartMenu = findViewById(R.id.btnStartMenu);
+            btnCopyPaks = findViewById(R.id.btnCopyPaks);
+            btnLaunchGame = findViewById(R.id.btnLaunchGame);
+            btnKillGame = findViewById(R.id.btnKillGame);
+            btnCheckAccess = findViewById(R.id.btnCheckAccess);
+            progressBar = findViewById(R.id.progressBar);
 
-        btnCheckAccess.setOnClickListener(v -> checkAccess());
-
-        btnCopyPaks.setOnClickListener(v -> showCopyDialog());
-
-        btnLaunchGame.setOnClickListener(v -> {
-            String pkg = config.getGamePackage();
-            if (!pkg.isEmpty()) {
-                GameLauncher.launchGame(this, pkg);
-            } else {
-                Toast.makeText(this, "No game detected!", Toast.LENGTH_LONG).show();
+            if (btnCheckAccess != null) {
+                btnCheckAccess.setOnClickListener(v -> checkAccess());
             }
-        });
 
-        btnKillGame.setOnClickListener(v -> {
-            String pkg = config.getGamePackage();
-            if (!pkg.isEmpty()) {
-                GameLauncher.killGame(pkg);
-                Toast.makeText(this, "Game killed", Toast.LENGTH_SHORT).show();
+            if (btnCopyPaks != null) {
+                btnCopyPaks.setOnClickListener(v -> showCopyDialog());
             }
-        });
 
-        btnStartMenu.setOnClickListener(v -> {
-            if (!Settings.canDrawOverlays(this)) {
-                requestOverlayPermission();
-            } else {
-                startFloatingMenu();
+            if (btnLaunchGame != null) {
+                btnLaunchGame.setOnClickListener(v -> {
+                    String pkg = config.getGamePackage();
+                    if (!pkg.isEmpty()) {
+                        GameLauncher.launchGame(this, pkg);
+                    } else {
+                        Toast.makeText(this, "No game detected!", Toast.LENGTH_LONG).show();
+                    }
+                });
             }
-        });
+
+            if (btnKillGame != null) {
+                btnKillGame.setOnClickListener(v -> {
+                    String pkg = config.getGamePackage();
+                    if (!pkg.isEmpty()) {
+                        GameLauncher.killGame(pkg);
+                        Toast.makeText(this, "Game killed", Toast.LENGTH_SHORT).show();
+                    }
+                });
+            }
+
+            if (btnStartMenu != null) {
+                btnStartMenu.setOnClickListener(v -> {
+                    if (!Settings.canDrawOverlays(this)) {
+                        requestOverlayPermission();
+                    } else {
+                        startFloatingMenu();
+                    }
+                });
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "initViews failed", e);
+        }
     }
 
     private void checkAccess() {
         Log.d(TAG, "=== checkAccess started ===");
 
-        // Detect game
-        String gamePkg = ShizukuHelper.detectInstalledGame(this);
-        Log.d(TAG, "Game detected: " + gamePkg);
+        try {
+            String gamePkg = null;
+            try {
+                gamePkg = ShizukuHelper.detectInstalledGame(this);
+            } catch (Exception e) {
+                Log.e(TAG, "Game detection failed", e);
+            }
+            
+            Log.d(TAG, "Game detected: " + gamePkg);
 
-        if (gamePkg != null) {
-            config.setGamePackage(gamePkg);
-            tvGamePkg.setText("Game: " + gamePkg);
-            tvGamePkg.setTextColor(0xFF4CAF50);
-        } else {
-            tvGamePkg.setText("Game: Not found");
-            tvGamePkg.setTextColor(0xFFF44336);
-        }
+            if (gamePkg != null) {
+                config.setGamePackage(gamePkg);
+                if (tvGamePkg != null) {
+                    tvGamePkg.setText("Game: " + gamePkg);
+                    tvGamePkg.setTextColor(0xFF4CAF50);
+                }
+            } else {
+                if (tvGamePkg != null) {
+                    tvGamePkg.setText("Game: Not found");
+                    tvGamePkg.setTextColor(0xFFF44336);
+                }
+            }
 
-        // Check root
-        boolean hasRoot = ShizukuHelper.isRootAvailable();
-        Log.d(TAG, "Root available: " + hasRoot);
+            boolean hasRoot = false;
+            try {
+                hasRoot = ShizukuHelper.isRootAvailable();
+            } catch (Exception e) {
+                Log.e(TAG, "Root check failed", e);
+            }
+            
+            Log.d(TAG, "Root available: " + hasRoot);
 
-        if (hasRoot) {
-            tvAccessMode.setText("Access: ROOT");
-            tvAccessMode.setTextColor(0xFF4CAF50);
-            tvStatus.setText("Root access granted");
-            tvStatus.setTextColor(0xFF4CAF50);
-            return;
-        }
+            if (hasRoot) {
+                if (tvAccessMode != null) {
+                    tvAccessMode.setText("Access: ROOT");
+                    tvAccessMode.setTextColor(0xFF4CAF50);
+                }
+                if (tvStatus != null) {
+                    tvStatus.setText("Root access granted");
+                    tvStatus.setTextColor(0xFF4CAF50);
+                }
+                return;
+            }
 
-        // Check Shizuku
-        boolean shizukuAvail = ShizukuHelper.isShizukuAvailable();
-        Log.d(TAG, "Shizuku available: " + shizukuAvail);
+            boolean shizukuAvail = false;
+            try {
+                shizukuAvail = ShizukuHelper.isShizukuAvailable();
+            } catch (Throwable t) {
+                Log.e(TAG, "Shizuku availability check failed", t);
+            }
+            
+            Log.d(TAG, "Shizuku available: " + shizukuAvail);
 
-        if (!shizukuAvail) {
-            tvAccessMode.setText("Access: NONE");
-            tvAccessMode.setTextColor(0xFFF44336);
-            tvStatus.setText("Shizuku not installed");
-            tvStatus.setTextColor(0xFFF44336);
-            showShizukuInstallDialog();
-            return;
-        }
+            if (!shizukuAvail) {
+                if (tvAccessMode != null) {
+                    tvAccessMode.setText("Access: NONE");
+                    tvAccessMode.setTextColor(0xFFF44336);
+                }
+                if (tvStatus != null) {
+                    tvStatus.setText("Shizuku not installed");
+                    tvStatus.setTextColor(0xFFF44336);
+                }
+                showShizukuInstallDialog();
+                return;
+            }
 
-        boolean binderAlive = ShizukuHelper.isBinderAlive();
-        Log.d(TAG, "Shizuku binder alive: " + binderAlive);
+            boolean binderAlive = false;
+            try {
+                binderAlive = ShizukuHelper.isBinderAlive();
+            } catch (Throwable t) {
+                Log.e(TAG, "Binder check failed", t);
+            }
+            
+            Log.d(TAG, "Shizuku binder alive: " + binderAlive);
 
-        if (!binderAlive) {
-            tvAccessMode.setText("Access: SHIZUKU (stopped)");
-            tvAccessMode.setTextColor(0xFFFF9800);
-            tvStatus.setText("Start Shizuku service first");
-            tvStatus.setTextColor(0xFFFF9800);
-            return;
-        }
+            if (!binderAlive) {
+                if (tvAccessMode != null) {
+                    tvAccessMode.setText("Access: SHIZUKU (stopped)");
+                    tvAccessMode.setTextColor(0xFFFF9800);
+                }
+                if (tvStatus != null) {
+                    tvStatus.setText("Start Shizuku service first");
+                    tvStatus.setTextColor(0xFFFF9800);
+                }
+                return;
+            }
 
-        boolean hasPerm = ShizukuHelper.hasPermission();
-        Log.d(TAG, "Shizuku permission: " + hasPerm);
+            boolean hasPerm = false;
+            try {
+                hasPerm = ShizukuHelper.hasPermission();
+            } catch (Throwable t) {
+                Log.e(TAG, "Permission check failed", t);
+            }
+            
+            Log.d(TAG, "Shizuku permission: " + hasPerm);
 
-        if (hasPerm) {
-            tvAccessMode.setText("Access: SHIZUKU");
-            tvAccessMode.setTextColor(0xFF4CAF50);
-            tvStatus.setText("Shizuku connected");
-            tvStatus.setTextColor(0xFF4CAF50);
-        } else {
-            tvAccessMode.setText("Access: SHIZUKU (no perm)");
-            tvAccessMode.setTextColor(0xFFFF9800);
-            tvStatus.setText("Requesting permission...");
-            tvStatus.setTextColor(0xFFFF9800);
-            ShizukuHelper.requestPermission(REQ_PERMISSION);
+            if (hasPerm) {
+                if (tvAccessMode != null) {
+                    tvAccessMode.setText("Access: SHIZUKU");
+                    tvAccessMode.setTextColor(0xFF4CAF50);
+                }
+                if (tvStatus != null) {
+                    tvStatus.setText("Shizuku connected");
+                    tvStatus.setTextColor(0xFF4CAF50);
+                }
+            } else {
+                if (tvAccessMode != null) {
+                    tvAccessMode.setText("Access: SHIZUKU (no perm)");
+                    tvAccessMode.setTextColor(0xFFFF9800);
+                }
+                if (tvStatus != null) {
+                    tvStatus.setText("Requesting permission...");
+                    tvStatus.setTextColor(0xFFFF9800);
+                }
+                
+                try {
+                    ShizukuHelper.requestPermission(REQ_PERMISSION);
+                } catch (Throwable t) {
+                    Log.e(TAG, "Permission request failed", t);
+                    showPermissionDeniedDialog();
+                }
+            }
+
+        } catch (Exception e) {
+            Log.e(TAG, "checkAccess failed", e);
+            if (tvStatus != null) {
+                tvStatus.setText("Error: " + e.getMessage());
+                tvStatus.setTextColor(0xFFF44336);
+            }
         }
 
         Log.d(TAG, "=== checkAccess finished ===");
     }
 
     private void showPermissionDeniedDialog() {
-        new AlertDialog.Builder(this)
-                .setTitle("Permission Required")
-                .setMessage("GSZ Loader needs Shizuku permission to work.\n\n" +
-                        "Please grant permission in Shizuku app:\n" +
-                        "1. Open Shizuku\n" +
-                        "2. Go to 'Authorized applications'\n" +
-                        "3. Find GSZ Loader and enable it")
-                .setPositiveButton("OPEN SHIZUKU", (d, w) -> {
-                    try {
-                        Intent intent = getPackageManager().getLaunchIntentForPackage("moe.shizuku.privileged.api");
-                        if (intent != null) {
-                            startActivity(intent);
+        try {
+            new AlertDialog.Builder(this)
+                    .setTitle("Permission Required")
+                    .setMessage("GSZ Loader needs Shizuku permission to work.\n\n" +
+                            "Please grant permission in Shizuku app:\n" +
+                            "1. Open Shizuku\n" +
+                            "2. Go to 'Authorized applications'\n" +
+                            "3. Find GSZ Loader and enable it")
+                    .setPositiveButton("OPEN SHIZUKU", (d, w) -> {
+                        try {
+                            Intent intent = getPackageManager().getLaunchIntentForPackage("moe.shizuku.privileged.api");
+                            if (intent != null) {
+                                startActivity(intent);
+                            }
+                        } catch (Exception e) {
+                            Toast.makeText(this, "Shizuku not found", Toast.LENGTH_SHORT).show();
                         }
-                    } catch (Exception e) {
-                        Toast.makeText(this, "Shizuku not found", Toast.LENGTH_SHORT).show();
-                    }
-                })
-                .setNegativeButton("RETRY", (d, w) -> checkAccess())
-                .setNeutralButton("FORCE CONTINUE", (d, w) -> {
-                    tvAccessMode.setText("Access: FORCED");
-                    tvAccessMode.setTextColor(0xFFFF9800);
-                    tvStatus.setText("Forced mode - may not work");
-                    tvStatus.setTextColor(0xFFFF9800);
-                })
-                .show();
+                    })
+                    .setNegativeButton("RETRY", (d, w) -> checkAccess())
+                    .setNeutralButton("FORCE CONTINUE", (d, w) -> {
+                        if (tvAccessMode != null) {
+                            tvAccessMode.setText("Access: FORCED");
+                            tvAccessMode.setTextColor(0xFFFF9800);
+                        }
+                        if (tvStatus != null) {
+                            tvStatus.setText("Forced mode - may not work");
+                            tvStatus.setTextColor(0xFFFF9800);
+                        }
+                    })
+                    .show();
+        } catch (Exception e) {
+            Log.e(TAG, "showPermissionDeniedDialog failed", e);
+        }
     }
 
     private void showShizukuInstallDialog() {
-        new AlertDialog.Builder(this)
-                .setTitle("Shizuku Required")
-                .setMessage("This app needs Shizuku for non-root access.\n\n" +
-                        "1. Install Shizuku from Play Store\n" +
-                        "2. Start Shizuku via wireless debugging or adb\n" +
-                        "3. Grant permission to this app\n\n" +
-                        "Or use a rooted device.")
-                .setPositiveButton("INSTALL", (d, w) -> {
-                    try {
-                        startActivity(new Intent(Intent.ACTION_VIEW,
-                                Uri.parse("market://details?id=moe.shizuku.privileged.api")));
-                    } catch (Exception e) {
-                        startActivity(new Intent(Intent.ACTION_VIEW,
-                                Uri.parse("https://play.google.com/store/apps/details?id=moe.shizuku.privileged.api")));
-                    }
-                })
-                .setNegativeButton("CANCEL", null)
-                .setNeutralButton("FORCE CONTINUE", (d, w) -> {
-                    tvAccessMode.setText("Access: FORCED");
-                    tvAccessMode.setTextColor(0xFFFF9800);
-                    tvStatus.setText("Forced mode - may not work");
-                    tvStatus.setTextColor(0xFFFF9800);
-                })
-                .show();
+        try {
+            new AlertDialog.Builder(this)
+                    .setTitle("Shizuku Required")
+                    .setMessage("This app needs Shizuku for non-root access.\n\n" +
+                            "1. Install Shizuku from Play Store\n" +
+                            "2. Start Shizuku via wireless debugging or adb\n" +
+                            "3. Grant permission to this app\n\n" +
+                            "Or use a rooted device.")
+                    .setPositiveButton("INSTALL", (d, w) -> {
+                        try {
+                            startActivity(new Intent(Intent.ACTION_VIEW,
+                                    Uri.parse("market://details?id=moe.shizuku.privileged.api")));
+                        } catch (Exception e) {
+                            startActivity(new Intent(Intent.ACTION_VIEW,
+                                    Uri.parse("https://play.google.com/store/apps/details?id=moe.shizuku.privileged.api")));
+                        }
+                    })
+                    .setNegativeButton("CANCEL", null)
+                    .setNeutralButton("FORCE CONTINUE", (d, w) -> {
+                        if (tvAccessMode != null) {
+                            tvAccessMode.setText("Access: FORCED");
+                            tvAccessMode.setTextColor(0xFFFF9800);
+                        }
+                        if (tvStatus != null) {
+                            tvStatus.setText("Forced mode - may not work");
+                            tvStatus.setTextColor(0xFFFF9800);
+                        }
+                    })
+                    .show();
+        } catch (Exception e) {
+            Log.e(TAG, "showShizukuInstallDialog failed", e);
+        }
     }
 
     private void showCopyDialog() {
@@ -255,34 +371,43 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void doCopyPaks(String gamePkg) {
-        progressBar.setVisibility(View.VISIBLE);
-        btnCopyPaks.setEnabled(false);
-        tvStatus.setText("Copying paks...");
+        if (progressBar != null) progressBar.setVisibility(View.VISIBLE);
+        if (btnCopyPaks != null) btnCopyPaks.setEnabled(false);
+        if (tvStatus != null) {
+            tvStatus.setText("Copying paks...");
+            tvStatus.setTextColor(0xFFFF9800);
+        }
 
         new Thread(() -> {
             PakManager.copyPaks(this, gamePkg, new PakManager.CopyCallback() {
                 @Override
                 public void onProgress(String fileName, int current, int total) {
                     handler.post(() -> {
-                        tvStatus.setText("Copying: " + fileName + " (" + current + "/" + total + ")");
+                        if (tvStatus != null) {
+                            tvStatus.setText("Copying: " + fileName + " (" + current + "/" + total + ")");
+                        }
                     });
                 }
 
                 @Override
                 public void onComplete(boolean success, String message) {
                     handler.post(() -> {
-                        progressBar.setVisibility(View.GONE);
-                        btnCopyPaks.setEnabled(true);
+                        if (progressBar != null) progressBar.setVisibility(View.GONE);
+                        if (btnCopyPaks != null) btnCopyPaks.setEnabled(true);
 
                         if (success) {
                             config.setPaksCopied(true);
-                            tvStatus.setText("Paks copied!");
-                            tvStatus.setTextColor(0xFF4CAF50);
+                            if (tvStatus != null) {
+                                tvStatus.setText("Paks copied!");
+                                tvStatus.setTextColor(0xFF4CAF50);
+                            }
                             Toast.makeText(MainActivity.this, "Success! Now launch game.", Toast.LENGTH_LONG).show();
                             config.writeLuaConfig();
                         } else {
-                            tvStatus.setText("Copy failed: " + message);
-                            tvStatus.setTextColor(0xFFF44336);
+                            if (tvStatus != null) {
+                                tvStatus.setText("Copy failed: " + message);
+                                tvStatus.setTextColor(0xFFF44336);
+                            }
                             Toast.makeText(MainActivity.this, message, Toast.LENGTH_LONG).show();
                         }
                     });
@@ -292,9 +417,13 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void requestOverlayPermission() {
-        Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                Uri.parse("package:" + getPackageName()));
-        startActivityForResult(intent, REQ_OVERLAY);
+        try {
+            Intent intent = new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                    Uri.parse("package:" + getPackageName()));
+            startActivityForResult(intent, REQ_OVERLAY);
+        } catch (Exception e) {
+            Log.e(TAG, "requestOverlayPermission failed", e);
+        }
     }
 
     private void startFloatingMenu() {
@@ -308,8 +437,6 @@ public class MainActivity extends AppCompatActivity {
             }
 
             Toast.makeText(this, "Floating menu started!", Toast.LENGTH_SHORT).show();
-
-            // Minimize main activity instead of finish
             moveTaskToBack(true);
 
         } catch (Exception e) {
@@ -340,13 +467,18 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-        checkAccess();
     }
 
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        if (permListener != null) { Shizuku.removeRequestPermissionResultListener(permListener); }
+        try {
+            if (permListener != null) {
+                Shizuku.removeRequestPermissionResultListener(permListener);
+            }
+        } catch (Throwable t) {
+            Log.e(TAG, "Failed to remove listener", t);
+        }
         Log.d(TAG, "MainActivity destroyed");
     }
 }
