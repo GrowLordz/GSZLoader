@@ -2,9 +2,8 @@ package com.gsz.loader;
 
 import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
-import androidx.core.app.NotificationCompat;
+import android.app.AlertDialog;
 import android.app.Notification;
-import androidx.core.app.NotificationCompat;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
@@ -26,7 +25,6 @@ import android.view.animation.BounceInterpolator;
 import android.view.animation.OvershootInterpolator;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
-import android.widget.TextView;
 import android.widget.Toast;
 
 public class FloatingMenuService extends Service {
@@ -90,11 +88,11 @@ public class FloatingMenuService extends Service {
                     this, 0, intent,
                     PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
 
-            NotificationCompat.Builder builder;
+            Notification.Builder builder;
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                builder = new NotificationCompat.Builder(this, CHANNEL_ID);
+                builder = new Notification.Builder(this, CHANNEL_ID);
             } else {
-                builder = new NotificationCompat.Builder(this);
+                builder = new Notification.Builder(this);
             }
 
             Notification notif = builder
@@ -153,6 +151,7 @@ public class FloatingMenuService extends Service {
             aimbotRow = overlayView.findViewById(R.id.aimbotRow);
             espIndicator = overlayView.findViewById(R.id.espIndicator);
             aimbotIndicator = overlayView.findViewById(R.id.aimbotIndicator);
+            btnClose = overlayView.findViewById(R.id.btnClose);
 
             if (btnToggle == null || panelContent == null) {
                 Log.e(TAG, "Required views not found in layout");
@@ -186,6 +185,17 @@ public class FloatingMenuService extends Service {
                     config.setAimbotEnabled(newState);
                     animateToggle(aimbotIndicator, newState);
                     showToast("Aimbot: " + (newState ? "ON" : "OFF"));
+                });
+            }
+
+            if (btnClose != null) {
+                btnClose.setOnClickListener(v -> {
+                    new AlertDialog.Builder(FloatingMenuService.this)
+                            .setTitle("Close Menu")
+                            .setMessage("Stop floating menu?")
+                            .setPositiveButton("YES", (d, w) -> stopSelf())
+                            .setNegativeButton("NO", null)
+                            .show();
                 });
             }
 
