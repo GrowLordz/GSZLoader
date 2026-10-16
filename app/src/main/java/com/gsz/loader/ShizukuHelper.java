@@ -20,13 +20,26 @@ public final class ShizukuHelper {
     private static boolean isRoot = false;
     private static Boolean rootChecked = null;
 
-    private static Process newProcessCompat(String[] cmd) throws Exception {
+    private static Process newProcessCompat(String[] cmd, String[] envp, String cwd) throws Exception {
         try {
             Method m = Shizuku.class.getDeclaredMethod("newProcess", String[].class, String[].class, String.class);
             m.setAccessible(true);
-            return (Process) m.invoke(null, cmd, null, null);
+            return (Process) m.invoke(null, cmd, envp, cwd);
         } catch (NoSuchMethodException e) {
-            return new ProcessBuilder(cmd).redirectErrorStream(true).start();
+            ProcessBuilder pb = new ProcessBuilder(cmd);
+            pb.redirectErrorStream(true);
+            if (envp != null) {
+                for (String entry : envp) {
+                    int idx = entry.indexOf('=');
+                    if (idx > 0) {
+                        pb.environment().put(entry.substring(0, idx), entry.substring(idx + 1));
+                    }
+                }
+            }
+            if (cwd != null) {
+                pb.directory(new File(cwd));
+            }
+            return pb.start();
         }
     }
 
