@@ -1,7 +1,6 @@
 package com.gsz.loader;
 
 import android.app.Activity;
-import android.app.Activity;
 import android.app.AlertDialog;
 import android.content.Intent;
 import android.content.pm.PackageManager;
@@ -36,7 +35,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        
+
         try {
             setContentView(R.layout.activity_main);
         } catch (Exception e) {
@@ -49,41 +48,42 @@ public class MainActivity extends Activity {
         config = new ConfigManager(this);
         handler = new Handler(Looper.getMainLooper());
 
+        // Initialize Shizuku binder listener FIRST
+        ShizukuHelper.initBinderListener();
+
         initViews();
 
-        try {
-            permListener = (requestCode, grantResult) -> {
-                if (requestCode == REQ_PERMISSION) {
-                    runOnUiThread(() -> {
-                        try {
-                            if (grantResult == PackageManager.PERMISSION_GRANTED) {
-                                tvAccessMode.setText("Access: SHIZUKU");
-                                tvAccessMode.setTextColor(0xFF4CAF50);
-                                tvStatus.setText("Shizuku connected");
-                                tvStatus.setTextColor(0xFF4CAF50);
-                                Toast.makeText(MainActivity.this, "Shizuku permission granted!", Toast.LENGTH_SHORT).show();
-                            } else {
-                                tvStatus.setText("Shizuku permission denied");
-                                tvStatus.setTextColor(0xFFF44336);
-                                showPermissionDeniedDialog();
-                            }
-                        } catch (Exception e) {
-                            Log.e(TAG, "Permission callback error", e);
+        // Initialize permission listener
+        permListener = (requestCode, grantResult) -> {
+            if (requestCode == REQ_PERMISSION) {
+                runOnUiThread(() -> {
+                    try {
+                        if (grantResult == PackageManager.PERMISSION_GRANTED) {
+                            tvAccessMode.setText("Access: SHIZUKU");
+                            tvAccessMode.setTextColor(0xFF4CAF50);
+                            tvStatus.setText("Shizuku connected");
+                            tvStatus.setTextColor(0xFF4CAF50);
+                            Toast.makeText(MainActivity.this, "Shizuku permission granted!", Toast.LENGTH_SHORT).show();
+                        } else {
+                            tvStatus.setText("Shizuku permission denied");
+                            tvStatus.setTextColor(0xFFF44336);
+                            showPermissionDeniedDialog();
                         }
-                    });
-                }
-            };
-            
-            try {
-                Shizuku.addRequestPermissionResultListener(permListener);
-            } catch (Throwable t) {
-                Log.e(TAG, "Failed to register Shizuku listener", t);
+                    } catch (Exception e) {
+                        Log.e(TAG, "Permission callback error", e);
+                    }
+                });
             }
+        };
+
+        try {
+            Shizuku.addRequestPermissionResultListener(permListener);
         } catch (Throwable t) {
-            Log.e(TAG, "Failed to create permission listener", t);
+            Log.e(TAG, "Failed to register Shizuku listener", t);
         }
 
-        checkAccess();
+        // Delay checkAccess to let Shizuku binder connect
+        handler.postDelayed(this::checkAccess, 500);
     }
 
     private void initViews() {
@@ -151,7 +151,7 @@ public class MainActivity extends Activity {
             } catch (Exception e) {
                 Log.e(TAG, "Game detection failed", e);
             }
-            
+
             Log.d(TAG, "Game detected: " + gamePkg);
 
             if (gamePkg != null) {
@@ -173,7 +173,7 @@ public class MainActivity extends Activity {
             } catch (Exception e) {
                 Log.e(TAG, "Root check failed", e);
             }
-            
+
             Log.d(TAG, "Root available: " + hasRoot);
 
             if (hasRoot) {
@@ -188,78 +188,39 @@ public class MainActivity extends Activity {
                 return;
             }
 
-            // Check Shizuku with retry
-            boolean shizukuAvail = false;
-            int retryCount = 0;
-            while (!shizukuAvail && retryCount < 3) {
-                try {
-                    shizukuAvail = ShizukuHelper.isShizukuAvailable();
-                    if (!shizukuAvail) {
-                        retryCount++;
-                        Thread.sleep(500);
-                    }
-                } catch (Throwable t) {
-                    Log.e(TAG, "Shizuku availability check failed", t);
-                    retryCount++;
-                }
-            }
-            
-            Log.d(TAG, "Shizuku available: " + shizukuAvail + " (retries: " + retryCount + ")");
-
-            if (!shizukuAvail) {
-                if (tvAccessMode != null) {
-                    tvAccessMode.setText("Access: NONE");
-                    tvAccessMode.setTextColor(0xFFF44336);
-                }
-                if (tvStatus != null) {
-                    tvStatus.setText("Shizuku not responding");
-                    tvStatus.setTextColor(0xFFF44336);
-                }
-                showShizukuInstallDialog();
-                return;
-            }
-
-            // Check binder with retry
+            // Check Shizuku binder with delay
             boolean binderAlive = false;
-            retryCount = 0;
-            while (!binderAlive && retryCount < 3) {
-                try {
-                    binderAlive = ShizukuHelper.isBinderAlive();
-                    if (!binderAlive) {
-                        retryCount++;
-                        Thread.sleep(500);
-                    }
-                } catch (Throwable t) {
-                    Log.e(TAG, "Binder check failed", t);
-                    retryCount++;
-                }
+            try {
+                binderAlive = ShizukuHelper.isBinderAlive();
+            } catch (Throwable t) {
+                Log.e(TAG, "Binder check failed", t);
             }
-            
-            Log.d(TAG, "Shizuku binder alive: " + binderAlive + " (retries: " + retryCount + ")");
+
+            Log.d(TAG, "Shizuku binder alive: " + binderAlive);
 
             if (!binderAlive) {
                 if (tvAccessMode != null) {
-                    tvAccessMode.setText("Access: SHIZUKU (stopped)");
+                    tvAccessMode.setText("Access: SHIZUKU (connecting...)");
                     tvAccessMode.setTextColor(0xFFFF9800);
                 }
                 if (tvStatus != null) {
-                    tvStatus.setText("Shizuku service not responding\nTap CHECK ACCESS to retry");
+                    tvStatus.setText("Waiting for Shizuku...");
                     tvStatus.setTextColor(0xFFFF9800);
                 }
-                
-                // Auto-retry after 2 seconds
-                handler.postDelayed(this::checkAccess, 2000);
+
+                // Retry after 1 second
+                handler.postDelayed(this::checkAccess, 1000);
                 return;
             }
 
-            // Check permission - auto request if not granted
+            // Binder is alive, check permission
             boolean hasPerm = false;
             try {
                 hasPerm = ShizukuHelper.hasPermission();
             } catch (Throwable t) {
                 Log.e(TAG, "Permission check failed", t);
             }
-            
+
             Log.d(TAG, "Shizuku permission: " + hasPerm);
 
             if (hasPerm) {
@@ -280,10 +241,9 @@ public class MainActivity extends Activity {
                     tvStatus.setText("Requesting Shizuku permission...");
                     tvStatus.setTextColor(0xFFFF9800);
                 }
-                
-                // Auto request permission
+
                 try {
-                    Log.d(TAG, "Auto-requesting Shizuku permission...");
+                    Log.d(TAG, "Requesting Shizuku permission...");
                     ShizukuHelper.requestPermission(REQ_PERMISSION);
                 } catch (Throwable t) {
                     Log.e(TAG, "Permission request failed", t);

@@ -1,16 +1,15 @@
-# GSZ Loader v3.0
+# GSZ Loader v4.0
 
 PUBG Mod Loader dengan floating menu overlay. Support root dan non-root (Shizuku).
 
-## Changelog v3.0
+## Changelog v4.0
 
-- Fixed: package detection (14+ package names + full scan fallback)
-- Fixed: floating menu crash on android 12+ (FOREGROUND_SERVICE_SPECIAL_USE)
-- Fixed: force close on re-open (proper service lifecycle)
-- Fixed: overlay not appearing (better error handling + logging)
-- Added: FORCE CONTINUE button in Shizuku dialog
-- Added: QUERY_ALL_PACKAGES permission for better game detection
-- Added: comprehensive logging for debugging
+- Fixed: Shizuku binder detection dengan `addBinderReceivedListenerSticky`
+- Fixed: tombol nggak bisa dipencet — touch handler return `false` biar click propagate
+- Fixed: crash/FC — defensive coding + proper lifecycle
+- Fixed: auto-retry Shizuku connection tiap 1 detik
+- Added: close button (X) di floating menu
+- Added: comprehensive logging untuk debug
 
 ## Fitur
 
@@ -21,6 +20,7 @@ PUBG Mod Loader dengan floating menu overlay. Support root dan non-root (Shizuku
 - Root support (auto-detect)
 - Pak injection ke game folder
 - Auto-detect game package
+- Close button untuk stop floating menu
 
 ## Cara Pakai
 
@@ -28,11 +28,12 @@ PUBG Mod Loader dengan floating menu overlay. Support root dan non-root (Shizuku
 
 1. Install Shizuku dari Play Store
 2. Start Shizuku via wireless debugging atau adb
-3. Buka GSZ Loader, grant Shizuku permission
+3. Buka GSZ Loader — tunggu "Shizuku connected"
 4. Tap "COPY PAKS TO GAME"
 5. Tap "LAUNCH GAME"
 6. Tap "START FLOATING MENU"
 7. Drag icon, tap untuk expand, toggle ESP/Aimbot
+8. Tap X untuk close floating menu
 
 ### Root
 
@@ -46,10 +47,8 @@ PUBG Mod Loader dengan floating menu overlay. Support root dan non-root (Shizuku
 Jika masih ada masalah, jalankan ini dengan adb:
 
 ```bash
-adb logcat -s MainActivity:D ShizukuHelper:D FloatingMenuService:D
+adb logcat -s MainActivity:D ShizukuHelper:D FloatingMenuService:D PakManager:D
 ```
-
-Lihat log untuk diagnosis.
 
 ## Build
 

@@ -27,6 +27,8 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.Toast;
 
+import androidx.core.app.NotificationCompat;
+
 public class FloatingMenuService extends Service {
 
     private static final String TAG = "FloatingMenuService";
@@ -88,11 +90,11 @@ public class FloatingMenuService extends Service {
                     this, 0, intent,
                     PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
 
-            Notification.Builder builder;
+            NotificationCompat.Builder builder;
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                builder = new Notification.Builder(this, CHANNEL_ID);
+                builder = new NotificationCompat.Builder(this, CHANNEL_ID);
             } else {
-                builder = new Notification.Builder(this);
+                builder = new NotificationCompat.Builder(this);
             }
 
             Notification notif = builder
@@ -162,7 +164,9 @@ public class FloatingMenuService extends Service {
             updateToggleUI(espIndicator, config.isEspEnabled());
             updateToggleUI(aimbotIndicator, config.isAimbotEnabled());
 
+            // Toggle button click - use OnClickListener directly
             btnToggle.setOnClickListener(v -> {
+                Log.d(TAG, "Toggle button clicked");
                 if (menuExpanded) {
                     collapseMenu();
                 } else {
@@ -170,8 +174,10 @@ public class FloatingMenuService extends Service {
                 }
             });
 
+            // ESP row click
             if (espRow != null) {
                 espRow.setOnClickListener(v -> {
+                    Log.d(TAG, "ESP row clicked");
                     boolean newState = !config.isEspEnabled();
                     config.setEspEnabled(newState);
                     animateToggle(espIndicator, newState);
@@ -179,8 +185,10 @@ public class FloatingMenuService extends Service {
                 });
             }
 
+            // Aimbot row click
             if (aimbotRow != null) {
                 aimbotRow.setOnClickListener(v -> {
+                    Log.d(TAG, "Aimbot row clicked");
                     boolean newState = !config.isAimbotEnabled();
                     config.setAimbotEnabled(newState);
                     animateToggle(aimbotIndicator, newState);
@@ -188,8 +196,10 @@ public class FloatingMenuService extends Service {
                 });
             }
 
+            // Close button click
             if (btnClose != null) {
                 btnClose.setOnClickListener(v -> {
+                    Log.d(TAG, "Close button clicked");
                     new AlertDialog.Builder(FloatingMenuService.this)
                             .setTitle("Close Menu")
                             .setMessage("Stop floating menu?")
@@ -199,6 +209,7 @@ public class FloatingMenuService extends Service {
                 });
             }
 
+            // Drag handling - ONLY on the root FrameLayout, not consuming child clicks
             overlayView.setOnTouchListener((v, event) -> {
                 try {
                     switch (event.getAction()) {
@@ -208,26 +219,32 @@ public class FloatingMenuService extends Service {
                             touchX = event.getRawX();
                             touchY = event.getRawY();
                             isDragging = false;
-                            return true;
+                            Log.d(TAG, "Touch DOWN at " + touchX + "," + touchY);
+                            return false; // Don't consume, let children handle
 
                         case MotionEvent.ACTION_MOVE:
                             float dx = event.getRawX() - touchX;
                             float dy = event.getRawY() - touchY;
-                            if (Math.abs(dx) > 15 || Math.abs(dy) > 15) {
+                            if (Math.abs(dx) > 20 || Math.abs(dy) > 20) {
                                 isDragging = true;
                             }
-                            params.x = (int) (initialX + dx);
-                            params.y = (int) (initialY + dy);
-                            if (windowManager != null && overlayView != null) {
-                                windowManager.updateViewLayout(overlayView, params);
+                            if (isDragging) {
+                                params.x = (int) (initialX + dx);
+                                params.y = (int) (initialY + dy);
+                                if (windowManager != null && overlayView != null) {
+                                    windowManager.updateViewLayout(overlayView, params);
+                                }
+                                return true; // Consume when dragging
                             }
-                            return true;
+                            return false;
 
                         case MotionEvent.ACTION_UP:
-                            if (!isDragging) {
-                                v.performClick();
+                            Log.d(TAG, "Touch UP, isDragging=" + isDragging);
+                            if (isDragging) {
+                                isDragging = false;
+                                return true; // Consume drag end
                             }
-                            return true;
+                            return false; // Let click propagate
                     }
                 } catch (Exception e) {
                     Log.e(TAG, "Touch handling failed", e);
@@ -248,6 +265,7 @@ public class FloatingMenuService extends Service {
         if (panelContent == null) return;
 
         menuExpanded = true;
+        Log.d(TAG, "Expanding menu");
 
         panelContent.setVisibility(View.VISIBLE);
         panelContent.setAlpha(0f);
@@ -278,6 +296,7 @@ public class FloatingMenuService extends Service {
         if (panelContent == null) return;
 
         menuExpanded = false;
+        Log.d(TAG, "Collapsing menu");
 
         AnimatorSet set = new AnimatorSet();
         set.playTogether(

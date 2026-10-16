@@ -28,7 +28,7 @@ public class PakManager {
 
             AssetManager am = ctx.getAssets();
             String[] files = am.list(PAK_DIR);
-            
+
             if (files == null || files.length == 0) {
                 Log.e(TAG, "No files in assets/" + PAK_DIR);
                 if (callback != null) callback.onComplete(false, "No paks in assets");
@@ -64,7 +64,7 @@ public class PakManager {
 
                 File out = new File(internalDir, f);
                 Log.d(TAG, "Extracting: " + f + " (" + current + "/" + total + ")");
-                
+
                 InputStream is = am.open(PAK_DIR + "/" + f);
                 FileOutputStream fos = new FileOutputStream(out);
                 byte[] buf = new byte[8192];
@@ -99,7 +99,7 @@ public class PakManager {
 
                     String dst = gamePakDir + f.getName();
                     Log.d(TAG, "Copying: " + f.getName() + " -> " + dst);
-                    
+
                     boolean ok = ShizukuHelper.copyFile(f.getAbsolutePath(), dst);
                     Log.d(TAG, "Copy result: " + ok);
 

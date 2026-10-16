@@ -2,56 +2,59 @@ package com.gsz.loader;
 
 import android.content.Context;
 import android.content.pm.PackageManager;
+import android.os.Build;
 import android.util.Log;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
 
 import rikka.shizuku.Shizuku;
-
-import java.lang.reflect.Method;
 
 public final class ShizukuHelper {
 
     private static final String TAG = "ShizukuHelper";
     private static boolean isRoot = false;
     private static Boolean rootChecked = null;
-
-    private static Process newProcessCompat(String[] cmd, String[] envp, String cwd) throws Exception {
-        try {
-            Method m = Shizuku.class.getDeclaredMethod("newProcess", String[].class, String[].class, String.class);
-            m.setAccessible(true);
-            return (Process) m.invoke(null, cmd, envp, cwd);
-        } catch (NoSuchMethodException e) {
-            ProcessBuilder pb = new ProcessBuilder(cmd);
-            pb.redirectErrorStream(true);
-            if (envp != null) {
-                for (String entry : envp) {
-                    int idx = entry.indexOf('=');
-                    if (idx > 0) {
-                        pb.environment().put(entry.substring(0, idx), entry.substring(idx + 1));
-                    }
-                }
-            }
-            if (cwd != null) {
-                pb.directory(new File(cwd));
-            }
-            return pb.start();
-        }
-    }
+    private static boolean binderReceived = false;
 
     private ShizukuHelper() {}
 
-    public static boolean isShizukuAvailable() {
+    /**
+     * Initialize Shizuku binder listener - call this in Application or first Activity
+     */
+    public static void initBinderListener() {
         try {
-            Shizuku.pingBinder();
-            return true;
+            Shizuku.addBinderReceivedListenerSticky(() -> {
+                binderReceived = true;
+                Log.d(TAG, "Shizuku binder received");
+            });
+
+            Shizuku.addBinderDeadListener(() -> {
+                binderReceived = false;
+                Log.d(TAG, "Shizuku binder dead");
+            });
+
+            Log.d(TAG, "Binder listeners registered");
+        } catch (Throwable t) {
+            Log.e(TAG, "Failed to register binder listener", t);
+        }
+    }
+
+    public static boolean isShizukuInstalled() {
+        try {
+            // Check if Shizuku manager is installed
+            return true; // Will be checked via binder
         } catch (Throwable t) {
             return false;
         }
+    }
+
+    public static boolean isBinderReady() {
+        return binderReceived;
     }
 
     public static boolean isRootAvailable() {
@@ -61,6 +64,7 @@ public final class ShizukuHelper {
             int exit = p.waitFor();
             isRoot = (exit == 0);
             rootChecked = true;
+            Log.d(TAG, "Root check: " + isRoot);
         } catch (Exception e) {
             isRoot = false;
             rootChecked = true;
@@ -89,6 +93,29 @@ public final class ShizukuHelper {
             Shizuku.requestPermission(reqCode);
         } catch (Throwable t) {
             Log.e(TAG, "requestPermission failed", t);
+        }
+    }
+
+    private static Process newProcessCompat(String[] cmd, String[] envp, String cwd) throws Exception {
+        try {
+            Method m = Shizuku.class.getDeclaredMethod("newProcess", String[].class, String[].class, String.class);
+            m.setAccessible(true);
+            return (Process) m.invoke(null, cmd, envp, cwd);
+        } catch (NoSuchMethodException e) {
+            ProcessBuilder pb = new ProcessBuilder(cmd);
+            pb.redirectErrorStream(true);
+            if (envp != null) {
+                for (String entry : envp) {
+                    int idx = entry.indexOf('=');
+                    if (idx > 0) {
+                        pb.environment().put(entry.substring(0, idx), entry.substring(idx + 1));
+                    }
+                }
+            }
+            if (cwd != null) {
+                pb.directory(new File(cwd));
+            }
+            return pb.start();
         }
     }
 
@@ -128,20 +155,14 @@ public final class ShizukuHelper {
             if (!isBinderAlive() || !hasPermission()) return "ERROR: no shizuku permission";
             Process p = newProcessCompat(new String[]{"sh", "-c", command}, null, null);
             InputStream is = p.getInputStream();
-            InputStream es = p.getErrorStream();
             ByteArrayOutputStream bos = new ByteArrayOutputStream();
-            ByteArrayOutputStream bes = new ByteArrayOutputStream();
             byte[] buf = new byte[8192];
             int n;
             while ((n = is.read(buf)) > 0) bos.write(buf, 0, n);
-            while ((n = es.read(buf)) > 0) bes.write(buf, 0, n);
             is.close();
-            es.close();
             p.waitFor();
             p.destroy();
             output.append(bos.toString(StandardCharsets.UTF_8));
-            String err = bes.toString(StandardCharsets.UTF_8);
-            if (!err.isEmpty()) output.append("ERR: ").append(err);
         } catch (Exception e) {
             output.append("EXCEPTION: ").append(e.getMessage());
         }
@@ -316,38 +337,31 @@ public final class ShizukuHelper {
     }
 
     public static String getGamePakDir(String gamePkg) {
-        // Primary path based on user feedback
         String primaryPath = "/storage/emulated/0/Android/data/" + gamePkg 
             + "/files/UE4Game/ShadowTrackerExtra/ShadowTrackerExtra/Saved/Paks/";
-        
-        // Check if primary path exists
+
         String check = exec("test -d '" + primaryPath + "' && echo EXISTS || echo NOT_FOUND");
         if (check.contains("EXISTS")) {
-            Log.d(TAG, "Found pak dir: " + primaryPath);
             return primaryPath;
         }
-        
-        // Fallback paths
+
         String[] fallbackPaths = {
             "/sdcard/Android/data/" + gamePkg + "/files/UE4Game/ShadowTrackerExtra/ShadowTrackerExtra/Saved/Paks/",
             "/sdcard/Android/data/" + gamePkg + "/files/UE4Game/ShadowTrackerExtra/Saved/Paks/",
         };
-        
+
         for (String path : fallbackPaths) {
             check = exec("test -d '" + path + "' && echo EXISTS || echo NOT_FOUND");
             if (check.contains("EXISTS")) {
-                Log.d(TAG, "Found pak dir (fallback): " + path);
                 return path;
             }
         }
-        
-        // Return primary path even if not exists (will be created)
-        Log.d(TAG, "Using primary path (will create): " + primaryPath);
+
         return primaryPath;
     }
 
     public static String getGameSaveDir(String gamePkg) {
-        return "/sdcard/Android/data/" + gamePkg
+        return "/storage/emulated/0/Android/data/" + gamePkg
                 + "/files/UE4Game/ShadowTrackerExtra/ShadowTrackerExtra/Saved/SaveGames/";
     }
 

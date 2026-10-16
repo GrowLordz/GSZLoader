@@ -19,7 +19,7 @@
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="PUBG Mod Loader v3.0"
+        android:text="PUBG Mod Loader v4.0"
         android:textSize="13sp"
         android:textColor="#666677"
         android:layout_marginBottom="24dp"/>
