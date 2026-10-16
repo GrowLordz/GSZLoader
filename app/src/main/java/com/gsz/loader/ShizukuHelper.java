@@ -1,7 +1,10 @@
 package com.gsz.loader;
 
 import android.content.Context;
+import android.content.Intent;
+import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
+import android.content.pm.ResolveInfo;
 import android.util.Log;
 
 import java.io.ByteArrayOutputStream;
@@ -10,6 +13,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 
 public final class ShizukuHelper {
 
@@ -21,7 +26,9 @@ public final class ShizukuHelper {
     static {
         try {
             shizukuClass = Class.forName("rikka.shizuku.Shizuku");
-        } catch (Throwable ignored) {
+            Log.d(TAG, "Shizuku class loaded via reflection");
+        } catch (Throwable t) {
+            Log.e(TAG, "Shizuku class not found: " + t.getMessage());
         }
     }
 
@@ -29,7 +36,13 @@ public final class ShizukuHelper {
     }
 
     public static boolean isShizukuAvailable() {
-        return shizukuClass != null;
+        if (shizukuClass != null) return true;
+        try {
+            shizukuClass = Class.forName("rikka.shizuku.Shizuku");
+            return true;
+        } catch (Throwable t) {
+            return false;
+        }
     }
 
     public static boolean isRootAvailable() {
@@ -39,6 +52,7 @@ public final class ShizukuHelper {
             int exit = p.waitFor();
             isRoot = (exit == 0);
             rootChecked = true;
+            Log.d(TAG, "Root check: " + isRoot);
         } catch (Exception e) {
             isRoot = false;
             rootChecked = true;
@@ -85,9 +99,7 @@ public final class ShizukuHelper {
     }
 
     public static String exec(String command) {
-        if (isRootAvailable()) {
-            return execRoot(command);
-        }
+        if (isRootAvailable()) return execRoot(command);
         return execShizuku(command);
     }
 
@@ -119,9 +131,7 @@ public final class ShizukuHelper {
     private static String execShizuku(String command) {
         StringBuilder output = new StringBuilder();
         try {
-            if (!isBinderAlive() || !hasPermission()) {
-                return "ERROR: no shizuku permission";
-            }
+            if (!isBinderAlive() || !hasPermission()) return "ERROR: no shizuku permission";
             Process p = shizukuNewProcess(new String[]{"sh", "-c", command});
             InputStream is = p.getInputStream();
             InputStream es = p.getErrorStream();
@@ -145,9 +155,7 @@ public final class ShizukuHelper {
     }
 
     public static boolean writeFile(String absPath, String content) {
-        if (isRootAvailable()) {
-            return writeFileRoot(absPath, content);
-        }
+        if (isRootAvailable()) return writeFileRoot(absPath, content);
         return writeFileShizuku(absPath, content);
     }
 
@@ -180,22 +188,17 @@ public final class ShizukuHelper {
         try {
             String parent = new File(absPath).getParent();
             if (parent != null) {
-                Process mk = shizukuNewProcess(
-                        new String[]{"sh", "-c", "mkdir -p '" + parent + "'"});
+                Process mk = shizukuNewProcess(new String[]{"sh", "-c", "mkdir -p '" + parent + "'"});
                 mk.waitFor();
                 mk.destroy();
             }
-
             Process p = shizukuNewProcess(new String[]{
-                    "sh", "-c",
-                    "cat > '" + absPath + "' && chmod 644 '" + absPath + "'"
+                    "sh", "-c", "cat > '" + absPath + "' && chmod 644 '" + absPath + "'"
             });
-
             OutputStream os = p.getOutputStream();
             os.write(content.getBytes(StandardCharsets.UTF_8));
             os.flush();
             os.close();
-
             int code = p.waitFor();
             p.destroy();
             return code == 0;
@@ -206,9 +209,7 @@ public final class ShizukuHelper {
     }
 
     public static String readFile(String absPath) {
-        if (isRootAvailable()) {
-            return readFileRoot(absPath);
-        }
+        if (isRootAvailable()) return readFileRoot(absPath);
         return readFileShizuku(absPath);
     }
 
@@ -252,9 +253,7 @@ public final class ShizukuHelper {
     }
 
     public static boolean copyFile(String src, String dst) {
-        if (isRootAvailable()) {
-            return copyFileRoot(src, dst);
-        }
+        if (isRootAvailable()) return copyFileRoot(src, dst);
         return copyFileShizuku(src, dst);
     }
 
@@ -275,8 +274,7 @@ public final class ShizukuHelper {
         if (!isBinderAlive() || !hasPermission()) return false;
         try {
             Process p = shizukuNewProcess(new String[]{
-                    "sh", "-c",
-                    "cp '" + src + "' '" + dst + "' && chmod 644 '" + dst + "'"
+                    "sh", "-c", "cp '" + src + "' '" + dst + "' && chmod 644 '" + dst + "'"
             });
             int code = p.waitFor();
             p.destroy();
@@ -313,23 +311,65 @@ public final class ShizukuHelper {
         exec("am force-stop " + packageName);
     }
 
+    /**
+     * FIXED: More robust game detection with multiple methods
+     */
     public static String detectInstalledGame(Context ctx) {
         PackageManager pm = ctx.getPackageManager();
-        String[] pkgs = {
+
+        // Method 1: Check known packages directly
+        String[] knownPkgs = {
                 "com.pubg.imobile",
                 "com.tencent.ig",
                 "com.tencent.igfit",
                 "com.pubg.krmobile",
                 "com.vng.pubgmobile",
-                "com.rekoo.pubgm"
+                "com.rekoo.pubgm",
+                "com.pubg.mobile",
+                "com.tencent.iglite",
+                "com.pubg.mobilelite",
+                "com.tencent.tmgp.pubgmhd",
+                "com.tencent.tmgp.pubgm",
+                "com.garena.game.kgvn",
+                "com.garena.game.pkgametw",
+                "com.garena.game.pkgame"
         };
-        for (String pkg : pkgs) {
+
+        for (String pkg : knownPkgs) {
             try {
                 pm.getPackageInfo(pkg, 0);
+                Log.d(TAG, "Game found (direct): " + pkg);
                 return pkg;
             } catch (PackageManager.NameNotFoundException ignored) {
             }
         }
+
+        // Method 2: Query all installed packages with PUBG-like names
+        try {
+            List<PackageInfo> allPackages = pm.getInstalledPackages(0);
+            for (PackageInfo pi : allPackages) {
+                String name = pi.packageName.toLowerCase();
+                if (name.contains("pubg") || name.contains("tencent.ig") ||
+                    name.contains("shadowtracker") || name.contains("battleground")) {
+                    Log.d(TAG, "Game found (scan): " + pi.packageName);
+                    return pi.packageName;
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Package scan failed: " + e.getMessage());
+        }
+
+        // Method 3: Check launch intents
+        try {
+            Intent launchIntent = pm.getLaunchIntentForPackage("com.tencent.ig");
+            if (launchIntent != null) return "com.tencent.ig";
+
+            launchIntent = pm.getLaunchIntentForPackage("com.pubg.imobile");
+            if (launchIntent != null) return "com.pubg.imobile";
+        } catch (Exception ignored) {
+        }
+
+        Log.e(TAG, "No game package detected!");
         return null;
     }
 

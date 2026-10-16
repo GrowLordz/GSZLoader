@@ -1,6 +1,16 @@
-# GSZ Loader v2.0
+# GSZ Loader v3.0
 
 PUBG Mod Loader dengan floating menu overlay. Support root dan non-root (Shizuku).
+
+## Changelog v3.0
+
+- Fixed: package detection (14+ package names + full scan fallback)
+- Fixed: floating menu crash on android 12+ (FOREGROUND_SERVICE_SPECIAL_USE)
+- Fixed: force close on re-open (proper service lifecycle)
+- Fixed: overlay not appearing (better error handling + logging)
+- Added: FORCE CONTINUE button in Shizuku dialog
+- Added: QUERY_ALL_PACKAGES permission for better game detection
+- Added: comprehensive logging for debugging
 
 ## Fitur
 
@@ -10,7 +20,7 @@ PUBG Mod Loader dengan floating menu overlay. Support root dan non-root (Shizuku
 - Shizuku support (non-root)
 - Root support (auto-detect)
 - Pak injection ke game folder
-- Auto-detect game package (BGMI, PUBG Global, KR, VN, TW)
+- Auto-detect game package
 
 ## Cara Pakai
 
@@ -22,8 +32,7 @@ PUBG Mod Loader dengan floating menu overlay. Support root dan non-root (Shizuku
 4. Tap "COPY PAKS TO GAME"
 5. Tap "LAUNCH GAME"
 6. Tap "START FLOATING MENU"
-7. Drag icon ke posisi suka, tap untuk expand menu
-8. Toggle ESP / Aimbot
+7. Drag icon, tap untuk expand, toggle ESP/Aimbot
 
 ### Root
 
@@ -32,52 +41,16 @@ PUBG Mod Loader dengan floating menu overlay. Support root dan non-root (Shizuku
 3. Tap "LAUNCH GAME"
 4. Tap "START FLOATING MENU"
 
-## Cara Kerja Toggle
+## Debug
 
+Jika masih ada masalah, jalankan ini dengan adb:
+
+```bash
+adb logcat -s MainActivity:D ShizukuHelper:D FloatingMenuService:D
 ```
-User tap toggle di floating menu
-         |
-ConfigManager.setEspEnabled(true)
-         |
-writeLuaConfig() -> generate grow_settings.txt
-         |
-ShizukuHelper.writeFile() -> copy ke game Paks folder
-         |
-Lua AutoSaveLoop() baca file tiap 3 detik
-         |
-_G.LexusConfig.EspVipPro = true
-         |
-ESP jalan di game
-```
+
+Lihat log untuk diagnosis.
 
 ## Build
 
-GitHub Actions auto-build on push to main. Download APK dari Artifacts.
-
-## Struktur Config
-
-Loader nulis `grow_settings.txt` ke:
-```
-/sdcard/Android/data/<pkg>/files/UE4Game/ShadowTrackerExtra/ShadowTrackerExtra/Saved/Paks/
-```
-
-Format sama persis dengan `SaveModSettings()` di lua mod:
-
-```lua
-return {
-LexusConfig = {
-  ["EspVipPro"] = true,
-  ["AimTouchEnable"] = true,
-  ...
-},
-CustomTextData = {}
-}
-```
-
-## Catatan
-
-- Toggle real-time kalau game udah jalan dan lua `AutoSaveLoop` aktif
-- Kalau game belum jalan, config kebaca pas `LoadModSettings()` di awal
-- Pak injection cuma perlu sekali, kecuali game update
-- Root lebih stabil, shizuku kadang ke-kill di background
-- Pastikan file .pak taruh di `app/src/main/assets/paks/` sebelum build
+GitHub Actions auto-build on push to main.

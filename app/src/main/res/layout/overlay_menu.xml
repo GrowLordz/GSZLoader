@@ -3,7 +3,6 @@
     android:layout_width="wrap_content"
     android:layout_height="wrap_content">
 
-    <!-- Toggle button (always visible) -->
     <ImageView
         android:id="@+id/btnToggle"
         android:layout_width="52dp"
@@ -13,7 +12,6 @@
         android:padding="12dp"
         android:elevation="10dp"/>
 
-    <!-- Menu panel (expand/collapse) -->
     <LinearLayout
         android:id="@+id/menuPanel"
         android:layout_width="220dp"
@@ -33,57 +31,64 @@
             android:textColor="#00D4AA"
             android:layout_marginBottom="14dp"/>
 
-        <!-- ESP Toggle Row -->
         <LinearLayout
-            android:id="@+id/espRow"
+            android:id="@+id/panelContent"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:padding="12dp"
-            android:background="?android:attr/selectableItemBackground"
-            android:layout_marginBottom="10dp">
+            android:orientation="vertical"
+            android:visibility="gone">
 
-            <TextView
-                android:id="@+id/espLabel"
-                android:layout_width="0dp"
+            <LinearLayout
+                android:id="@+id/espRow"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="ESP"
-                android:textSize="15sp"
-                android:textColor="#FFFFFF"/>
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:padding="12dp"
+                android:background="?android:attr/selectableItemBackground"
+                android:layout_marginBottom="10dp">
 
-            <View
-                android:id="@+id/espIndicator"
-                android:layout_width="44dp"
-                android:layout_height="24dp"
-                android:background="@drawable/bg_toggle_off"/>
-        </LinearLayout>
+                <TextView
+                    android:id="@+id/espLabel"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="ESP"
+                    android:textSize="15sp"
+                    android:textColor="#FFFFFF"/>
 
-        <!-- Aimbot Toggle Row -->
-        <LinearLayout
-            android:id="@+id/aimbotRow"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:padding="12dp"
-            android:background="?android:attr/selectableItemBackground">
+                <View
+                    android:id="@+id/espIndicator"
+                    android:layout_width="44dp"
+                    android:layout_height="24dp"
+                    android:background="@drawable/bg_toggle_off"/>
+            </LinearLayout>
 
-            <TextView
-                android:id="@+id/aimbotLabel"
-                android:layout_width="0dp"
+            <LinearLayout
+                android:id="@+id/aimbotRow"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
-                android:text="AIMBOT"
-                android:textSize="15sp"
-                android:textColor="#FFFFFF"/>
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:padding="12dp"
+                android:background="?android:attr/selectableItemBackground">
 
-            <View
-                android:id="@+id/aimbotIndicator"
-                android:layout_width="44dp"
-                android:layout_height="24dp"
-                android:background="@drawable/bg_toggle_off"/>
+                <TextView
+                    android:id="@+id/aimbotLabel"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="AIMBOT"
+                    android:textSize="15sp"
+                    android:textColor="#FFFFFF"/>
+
+                <View
+                    android:id="@+id/aimbotIndicator"
+                    android:layout_width="44dp"
+                    android:layout_height="24dp"
+                    android:background="@drawable/bg_toggle_off"/>
+            </LinearLayout>
+
         </LinearLayout>
 
     </LinearLayout>

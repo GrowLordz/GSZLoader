@@ -10,6 +10,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.Settings;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ProgressBar;
@@ -18,6 +19,7 @@ import android.widget.Toast;
 
 public class MainActivity extends Activity {
 
+    private static final String TAG = "MainActivity";
     private static final int REQ_PERMISSION = 1001;
     private static final int REQ_OVERLAY = 1002;
 
@@ -81,8 +83,12 @@ public class MainActivity extends Activity {
     }
 
     private void checkAccess() {
+        Log.d(TAG, "=== checkAccess started ===");
+
         // Detect game
         String gamePkg = ShizukuHelper.detectInstalledGame(this);
+        Log.d(TAG, "Game detected: " + gamePkg);
+
         if (gamePkg != null) {
             config.setGamePackage(gamePkg);
             tvGamePkg.setText("Game: " + gamePkg);
@@ -92,8 +98,10 @@ public class MainActivity extends Activity {
             tvGamePkg.setTextColor(0xFFF44336);
         }
 
-        // Check root first
+        // Check root
         boolean hasRoot = ShizukuHelper.isRootAvailable();
+        Log.d(TAG, "Root available: " + hasRoot);
+
         if (hasRoot) {
             tvAccessMode.setText("Access: ROOT");
             tvAccessMode.setTextColor(0xFF4CAF50);
@@ -102,8 +110,11 @@ public class MainActivity extends Activity {
             return;
         }
 
-        // Check shizuku
-        if (!ShizukuHelper.isShizukuAvailable()) {
+        // Check Shizuku
+        boolean shizukuAvail = ShizukuHelper.isShizukuAvailable();
+        Log.d(TAG, "Shizuku available: " + shizukuAvail);
+
+        if (!shizukuAvail) {
             tvAccessMode.setText("Access: NONE");
             tvAccessMode.setTextColor(0xFFF44336);
             tvStatus.setText("Shizuku not installed");
@@ -112,25 +123,34 @@ public class MainActivity extends Activity {
             return;
         }
 
-        if (ShizukuHelper.isBinderAlive()) {
-            if (ShizukuHelper.hasPermission()) {
-                tvAccessMode.setText("Access: SHIZUKU");
-                tvAccessMode.setTextColor(0xFF4CAF50);
-                tvStatus.setText("Shizuku connected");
-                tvStatus.setTextColor(0xFF4CAF50);
-            } else {
-                tvAccessMode.setText("Access: SHIZUKU (no perm)");
-                tvAccessMode.setTextColor(0xFFFF9800);
-                tvStatus.setText("Requesting Shizuku permission...");
-                tvStatus.setTextColor(0xFFFF9800);
-                ShizukuHelper.requestPermission(REQ_PERMISSION);
-            }
-        } else {
+        boolean binderAlive = ShizukuHelper.isBinderAlive();
+        Log.d(TAG, "Shizuku binder alive: " + binderAlive);
+
+        if (!binderAlive) {
             tvAccessMode.setText("Access: SHIZUKU (stopped)");
             tvAccessMode.setTextColor(0xFFFF9800);
             tvStatus.setText("Start Shizuku service first");
             tvStatus.setTextColor(0xFFFF9800);
+            return;
         }
+
+        boolean hasPerm = ShizukuHelper.hasPermission();
+        Log.d(TAG, "Shizuku permission: " + hasPerm);
+
+        if (hasPerm) {
+            tvAccessMode.setText("Access: SHIZUKU");
+            tvAccessMode.setTextColor(0xFF4CAF50);
+            tvStatus.setText("Shizuku connected");
+            tvStatus.setTextColor(0xFF4CAF50);
+        } else {
+            tvAccessMode.setText("Access: SHIZUKU (no perm)");
+            tvAccessMode.setTextColor(0xFFFF9800);
+            tvStatus.setText("Requesting permission...");
+            tvStatus.setTextColor(0xFFFF9800);
+            ShizukuHelper.requestPermission(REQ_PERMISSION);
+        }
+
+        Log.d(TAG, "=== checkAccess finished ===");
     }
 
     private void showShizukuInstallDialog() {
@@ -141,7 +161,7 @@ public class MainActivity extends Activity {
                         "2. Start Shizuku via wireless debugging or adb\n" +
                         "3. Grant permission to this app\n\n" +
                         "Or use a rooted device.")
-                .setPositiveButton("Install", (d, w) -> {
+                .setPositiveButton("INSTALL", (d, w) -> {
                     try {
                         startActivity(new Intent(Intent.ACTION_VIEW,
                                 Uri.parse("market://details?id=moe.shizuku.privileged.api")));
@@ -150,7 +170,13 @@ public class MainActivity extends Activity {
                                 Uri.parse("https://play.google.com/store/apps/details?id=moe.shizuku.privileged.api")));
                     }
                 })
-                .setNegativeButton("Cancel", null)
+                .setNegativeButton("CANCEL", null)
+                .setNeutralButton("FORCE CONTINUE", (d, w) -> {
+                    tvAccessMode.setText("Access: FORCED");
+                    tvAccessMode.setTextColor(0xFFFF9800);
+                    tvStatus.setText("Forced mode - may not work");
+                    tvStatus.setTextColor(0xFFFF9800);
+                })
                 .show();
     }
 
@@ -201,8 +227,6 @@ public class MainActivity extends Activity {
                             tvStatus.setText("Paks copied!");
                             tvStatus.setTextColor(0xFF4CAF50);
                             Toast.makeText(MainActivity.this, "Success! Now launch game.", Toast.LENGTH_LONG).show();
-
-                            // Also write initial config
                             config.writeLuaConfig();
                         } else {
                             tvStatus.setText("Copy failed: " + message);
@@ -222,14 +246,24 @@ public class MainActivity extends Activity {
     }
 
     private void startFloatingMenu() {
-        Intent intent = new Intent(this, FloatingMenuService.class);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(intent);
-        } else {
-            startService(intent);
+        try {
+            Intent intent = new Intent(this, FloatingMenuService.class);
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(intent);
+            } else {
+                startService(intent);
+            }
+
+            Toast.makeText(this, "Floating menu started!", Toast.LENGTH_SHORT).show();
+
+            // Minimize main activity instead of finish
+            moveTaskToBack(true);
+
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to start floating menu", e);
+            Toast.makeText(this, "Error: " + e.getMessage(), Toast.LENGTH_LONG).show();
         }
-        Toast.makeText(this, "Floating menu started!", Toast.LENGTH_SHORT).show();
-        finish();
     }
 
     @Override
@@ -255,5 +289,11 @@ public class MainActivity extends Activity {
     protected void onResume() {
         super.onResume();
         checkAccess();
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        Log.d(TAG, "MainActivity destroyed");
     }
 }

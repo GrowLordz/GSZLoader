@@ -19,6 +19,13 @@ jobs:
         distribution: 'temurin'
         java-version: '17'
 
+    - name: Download Gradle 8.5
+      run: |
+        wget -q https://services.gradle.org/distributions/gradle-8.5-bin.zip -O /tmp/gradle.zip
+        sudo unzip -q /tmp/gradle.zip -d /opt/
+        sudo ln -sf /opt/gradle-8.5/bin/gradle /usr/local/bin/gradle
+        gradle --version
+
     - name: Setup Android SDK
       run: |
         export ANDROID_HOME=$HOME/android-sdk

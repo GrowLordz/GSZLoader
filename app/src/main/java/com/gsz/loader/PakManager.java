@@ -27,7 +27,6 @@ public class PakManager {
                 return;
             }
 
-            // Count valid pak files
             int total = 0;
             for (String f : files) {
                 if (f.endsWith(".pak") || f.endsWith(".lua")) total++;
@@ -41,7 +40,6 @@ public class PakManager {
             File internalDir = new File(ctx.getFilesDir(), "paks");
             if (!internalDir.exists()) internalDir.mkdirs();
 
-            // Extract from assets
             int current = 0;
             for (String f : files) {
                 if (!f.endsWith(".pak") && !f.endsWith(".lua")) continue;
@@ -49,12 +47,10 @@ public class PakManager {
 
                 File out = new File(internalDir, f);
                 if (out.exists() && out.length() > 0) {
-                    Log.d(TAG, "Skipping existing: " + f);
                     if (callback != null) callback.onProgress(f, current, total);
                     continue;
                 }
 
-                Log.d(TAG, "Extracting: " + f);
                 InputStream is = am.open(PAK_DIR + "/" + f);
                 FileOutputStream fos = new FileOutputStream(out);
                 byte[] buf = new byte[8192];
@@ -68,31 +64,21 @@ public class PakManager {
                 if (callback != null) callback.onProgress(f, current, total);
             }
 
-            // Create game directories
             String gamePakDir = ShizukuHelper.getGamePakDir(gamePkg);
-            String gameSaveDir = ShizukuHelper.getGameSaveDir(gamePkg);
+            ShizukuHelper.mkdir(gamePakDir);
 
-            boolean dirOk = ShizukuHelper.mkdir(gamePakDir);
-            Log.d(TAG, "Created pak dir: " + dirOk);
-
-            // Copy paks to game folder
             current = 0;
             File[] pakFiles = internalDir.listFiles();
             if (pakFiles != null) {
                 for (File f : pakFiles) {
                     if (!f.getName().endsWith(".pak") && !f.getName().endsWith(".lua")) continue;
                     current++;
-
                     String dst = gamePakDir + f.getName();
-                    Log.d(TAG, "Copying to game: " + f.getName());
-                    boolean ok = ShizukuHelper.copyFile(f.getAbsolutePath(), dst);
-                    Log.d(TAG, "Copy result: " + ok);
-
+                    ShizukuHelper.copyFile(f.getAbsolutePath(), dst);
                     if (callback != null) callback.onProgress(f.getName(), current, pakFiles.length);
                 }
             }
 
-            // Copy config
             File cfg = new File(ctx.getFilesDir(), "grow_settings.txt");
             if (cfg.exists()) {
                 ShizukuHelper.copyFile(cfg.getAbsolutePath(), gamePakDir + "grow_settings.txt");

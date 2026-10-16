@@ -2,7 +2,6 @@ package com.gsz.loader;
 
 import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
-import android.animation.ValueAnimator;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
@@ -14,6 +13,7 @@ import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
+import android.util.Log;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
@@ -29,6 +29,7 @@ import android.widget.Toast;
 
 public class FloatingMenuService extends Service {
 
+    private static final String TAG = "FloatingMenuService";
     private static final int NOTIF_ID = 1;
     private static final String CHANNEL_ID = "gsz_menu";
 
@@ -39,7 +40,6 @@ public class FloatingMenuService extends Service {
     private LinearLayout panelContent;
     private View espRow, aimbotRow;
     private View espIndicator, aimbotIndicator;
-    private TextView espLabel, aimbotLabel;
 
     private boolean menuExpanded = false;
     private ConfigManager config;
@@ -49,135 +49,191 @@ public class FloatingMenuService extends Service {
     private float touchX, touchY;
     private boolean isDragging = false;
 
+    private static boolean isRunning = false;
+
+    public static boolean isRunning() {
+        return isRunning;
+    }
+
     @Override
     public void onCreate() {
         super.onCreate();
-        config = new ConfigManager(this);
-        handler = new Handler(Looper.getMainLooper());
-        startForegroundWithNotification();
-        createOverlay();
+        Log.d(TAG, "onCreate called");
+
+        try {
+            isRunning = true;
+            config = new ConfigManager(this);
+            handler = new Handler(Looper.getMainLooper());
+            startForegroundWithNotification();
+            createOverlay();
+        } catch (Exception e) {
+            Log.e(TAG, "onCreate failed", e);
+            stopSelf();
+        }
     }
 
     private void startForegroundWithNotification() {
-        NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+        try {
+            NotificationManager nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            NotificationChannel channel = new NotificationChannel(
-                    CHANNEL_ID, "GSZ Menu", NotificationManager.IMPORTANCE_MIN);
-            nm.createNotificationChannel(channel);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                NotificationChannel channel = new NotificationChannel(
+                        CHANNEL_ID, "GSZ Menu", NotificationManager.IMPORTANCE_MIN);
+                nm.createNotificationChannel(channel);
+            }
+
+            Intent intent = new Intent(this, MainActivity.class);
+            PendingIntent pi = PendingIntent.getActivity(
+                    this, 0, intent,
+                    PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
+
+            Notification.Builder builder;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                builder = new Notification.Builder(this, CHANNEL_ID);
+            } else {
+                builder = new Notification.Builder(this);
+            }
+
+            Notification notif = builder
+                    .setContentTitle("GSZ Loader")
+                    .setContentText("Floating menu active - tap to open")
+                    .setSmallIcon(android.R.drawable.ic_dialog_info)
+                    .setContentIntent(pi)
+                    .setOngoing(true)
+                    .build();
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(NOTIF_ID, notif, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
+            } else {
+                startForeground(NOTIF_ID, notif);
+            }
+
+            Log.d(TAG, "Foreground notification started");
+        } catch (Exception e) {
+            Log.e(TAG, "startForeground failed", e);
         }
-
-        Intent intent = new Intent(this, MainActivity.class);
-        PendingIntent pi = PendingIntent.getActivity(
-                this, 0, intent,
-                PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
-
-        Notification.Builder builder;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            builder = new Notification.Builder(this, CHANNEL_ID);
-        } else {
-            builder = new Notification.Builder(this);
-        }
-
-        Notification notif = builder
-                .setContentTitle("GSZ Loader")
-                .setContentText("Floating menu active")
-                .setSmallIcon(android.R.drawable.ic_dialog_info)
-                .setContentIntent(pi)
-                .setOngoing(true)
-                .build();
-
-        startForeground(NOTIF_ID, notif);
     }
 
     private void createOverlay() {
-        windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
+        try {
+            windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
 
-        int type = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O
-                ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-                : WindowManager.LayoutParams.TYPE_PHONE;
-
-        final WindowManager.LayoutParams params = new WindowManager.LayoutParams(
-                WindowManager.LayoutParams.WRAP_CONTENT,
-                WindowManager.LayoutParams.WRAP_CONTENT,
-                type,
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
-                PixelFormat.TRANSLUCENT);
-
-        params.gravity = Gravity.TOP | Gravity.START;
-        params.x = 50;
-        params.y = 200;
-
-        overlayView = LayoutInflater.from(this).inflate(R.layout.overlay_menu, null);
-        menuPanel = overlayView.findViewById(R.id.menuPanel);
-        btnToggle = overlayView.findViewById(R.id.btnToggle);
-        panelContent = overlayView.findViewById(R.id.panelContent);
-        espRow = overlayView.findViewById(R.id.espRow);
-        aimbotRow = overlayView.findViewById(R.id.aimbotRow);
-        espIndicator = overlayView.findViewById(R.id.espIndicator);
-        aimbotIndicator = overlayView.findViewById(R.id.aimbotIndicator);
-        espLabel = overlayView.findViewById(R.id.espLabel);
-        aimbotLabel = overlayView.findViewById(R.id.aimbotLabel);
-
-        updateToggleUI(espIndicator, config.isEspEnabled());
-        updateToggleUI(aimbotIndicator, config.isAimbotEnabled());
-
-        btnToggle.setOnClickListener(v -> {
-            if (menuExpanded) {
-                collapseMenu();
+            int type;
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                type = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY;
             } else {
-                expandMenu();
+                type = WindowManager.LayoutParams.TYPE_PHONE;
             }
-        });
 
-        espRow.setOnClickListener(v -> {
-            boolean newState = !config.isEspEnabled();
-            config.setEspEnabled(newState);
-            animateToggle(espIndicator, newState);
-            showToast("ESP: " + (newState ? "ON" : "OFF"));
-        });
+            final WindowManager.LayoutParams params = new WindowManager.LayoutParams(
+                    WindowManager.LayoutParams.WRAP_CONTENT,
+                    WindowManager.LayoutParams.WRAP_CONTENT,
+                    type,
+                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+                    PixelFormat.TRANSLUCENT);
 
-        aimbotRow.setOnClickListener(v -> {
-            boolean newState = !config.isAimbotEnabled();
-            config.setAimbotEnabled(newState);
-            animateToggle(aimbotIndicator, newState);
-            showToast("Aimbot: " + (newState ? "ON" : "OFF"));
-        });
+            params.gravity = Gravity.TOP | Gravity.START;
+            params.x = 50;
+            params.y = 200;
 
-        overlayView.setOnTouchListener((v, event) -> {
-            switch (event.getAction()) {
-                case MotionEvent.ACTION_DOWN:
-                    initialX = params.x;
-                    initialY = params.y;
-                    touchX = event.getRawX();
-                    touchY = event.getRawY();
-                    isDragging = false;
-                    return true;
-
-                case MotionEvent.ACTION_MOVE:
-                    float dx = event.getRawX() - touchX;
-                    float dy = event.getRawY() - touchY;
-                    if (Math.abs(dx) > 15 || Math.abs(dy) > 15) {
-                        isDragging = true;
-                    }
-                    params.x = (int) (initialX + dx);
-                    params.y = (int) (initialY + dy);
-                    windowManager.updateViewLayout(overlayView, params);
-                    return true;
-
-                case MotionEvent.ACTION_UP:
-                    if (!isDragging) {
-                        v.performClick();
-                    }
-                    return true;
+            overlayView = LayoutInflater.from(this).inflate(R.layout.overlay_menu, null);
+            if (overlayView == null) {
+                Log.e(TAG, "Failed to inflate overlay_menu");
+                stopSelf();
+                return;
             }
-            return false;
-        });
 
-        windowManager.addView(overlayView, params);
+            menuPanel = overlayView.findViewById(R.id.menuPanel);
+            btnToggle = overlayView.findViewById(R.id.btnToggle);
+            panelContent = overlayView.findViewById(R.id.panelContent);
+            espRow = overlayView.findViewById(R.id.espRow);
+            aimbotRow = overlayView.findViewById(R.id.aimbotRow);
+            espIndicator = overlayView.findViewById(R.id.espIndicator);
+            aimbotIndicator = overlayView.findViewById(R.id.aimbotIndicator);
+
+            if (btnToggle == null || panelContent == null) {
+                Log.e(TAG, "Required views not found in layout");
+                stopSelf();
+                return;
+            }
+
+            updateToggleUI(espIndicator, config.isEspEnabled());
+            updateToggleUI(aimbotIndicator, config.isAimbotEnabled());
+
+            btnToggle.setOnClickListener(v -> {
+                if (menuExpanded) {
+                    collapseMenu();
+                } else {
+                    expandMenu();
+                }
+            });
+
+            if (espRow != null) {
+                espRow.setOnClickListener(v -> {
+                    boolean newState = !config.isEspEnabled();
+                    config.setEspEnabled(newState);
+                    animateToggle(espIndicator, newState);
+                    showToast("ESP: " + (newState ? "ON" : "OFF"));
+                });
+            }
+
+            if (aimbotRow != null) {
+                aimbotRow.setOnClickListener(v -> {
+                    boolean newState = !config.isAimbotEnabled();
+                    config.setAimbotEnabled(newState);
+                    animateToggle(aimbotIndicator, newState);
+                    showToast("Aimbot: " + (newState ? "ON" : "OFF"));
+                });
+            }
+
+            overlayView.setOnTouchListener((v, event) -> {
+                try {
+                    switch (event.getAction()) {
+                        case MotionEvent.ACTION_DOWN:
+                            initialX = params.x;
+                            initialY = params.y;
+                            touchX = event.getRawX();
+                            touchY = event.getRawY();
+                            isDragging = false;
+                            return true;
+
+                        case MotionEvent.ACTION_MOVE:
+                            float dx = event.getRawX() - touchX;
+                            float dy = event.getRawY() - touchY;
+                            if (Math.abs(dx) > 15 || Math.abs(dy) > 15) {
+                                isDragging = true;
+                            }
+                            params.x = (int) (initialX + dx);
+                            params.y = (int) (initialY + dy);
+                            if (windowManager != null && overlayView != null) {
+                                windowManager.updateViewLayout(overlayView, params);
+                            }
+                            return true;
+
+                        case MotionEvent.ACTION_UP:
+                            if (!isDragging) {
+                                v.performClick();
+                            }
+                            return true;
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "Touch handling failed", e);
+                }
+                return false;
+            });
+
+            windowManager.addView(overlayView, params);
+            Log.d(TAG, "Overlay view added successfully");
+
+        } catch (Exception e) {
+            Log.e(TAG, "createOverlay failed", e);
+            stopSelf();
+        }
     }
 
     private void expandMenu() {
+        if (panelContent == null) return;
+
         menuExpanded = true;
 
         panelContent.setVisibility(View.VISIBLE);
@@ -197,20 +253,17 @@ public class FloatingMenuService extends Service {
         set.setInterpolator(new OvershootInterpolator(1.3f));
         set.start();
 
-        ObjectAnimator rotate = ObjectAnimator.ofFloat(btnToggle, "rotation", 0f, 45f);
-        rotate.setDuration(280);
-        rotate.setInterpolator(new AccelerateDecelerateInterpolator());
-        rotate.start();
-
-        ObjectAnimator scaleBtn = ObjectAnimator.ofFloat(btnToggle, "scaleX", 1f, 1.15f, 1f);
-        ObjectAnimator scaleBtnY = ObjectAnimator.ofFloat(btnToggle, "scaleY", 1f, 1.15f, 1f);
-        AnimatorSet btnAnim = new AnimatorSet();
-        btnAnim.playTogether(scaleBtn, scaleBtnY);
-        btnAnim.setDuration(280);
-        btnAnim.start();
+        if (btnToggle != null) {
+            ObjectAnimator rotate = ObjectAnimator.ofFloat(btnToggle, "rotation", 0f, 45f);
+            rotate.setDuration(280);
+            rotate.setInterpolator(new AccelerateDecelerateInterpolator());
+            rotate.start();
+        }
     }
 
     private void collapseMenu() {
+        if (panelContent == null) return;
+
         menuExpanded = false;
 
         AnimatorSet set = new AnimatorSet();
@@ -225,17 +278,23 @@ public class FloatingMenuService extends Service {
         set.addListener(new android.animation.AnimatorListenerAdapter() {
             @Override
             public void onAnimationEnd(android.animation.Animator animation) {
-                panelContent.setVisibility(View.GONE);
+                if (panelContent != null) {
+                    panelContent.setVisibility(View.GONE);
+                }
             }
         });
         set.start();
 
-        ObjectAnimator rotate = ObjectAnimator.ofFloat(btnToggle, "rotation", 45f, 0f);
-        rotate.setDuration(280);
-        rotate.start();
+        if (btnToggle != null) {
+            ObjectAnimator rotate = ObjectAnimator.ofFloat(btnToggle, "rotation", 45f, 0f);
+            rotate.setDuration(280);
+            rotate.start();
+        }
     }
 
     private void animateToggle(View indicator, boolean enabled) {
+        if (indicator == null) return;
+
         ObjectAnimator scaleX = ObjectAnimator.ofFloat(indicator, "scaleX", 1f, 1.4f, 1f);
         ObjectAnimator scaleY = ObjectAnimator.ofFloat(indicator, "scaleY", 1f, 1.4f, 1f);
         AnimatorSet bounce = new AnimatorSet();
@@ -248,6 +307,8 @@ public class FloatingMenuService extends Service {
     }
 
     private void updateToggleUI(View indicator, boolean enabled) {
+        if (indicator == null) return;
+
         if (enabled) {
             indicator.setBackgroundResource(R.drawable.bg_toggle_on);
         } else {
@@ -265,10 +326,26 @@ public class FloatingMenuService extends Service {
     }
 
     @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        Log.d(TAG, "onStartCommand called");
+        return START_STICKY;
+    }
+
+    @Override
     public void onDestroy() {
         super.onDestroy();
-        if (overlayView != null && windowManager != null) {
-            windowManager.removeView(overlayView);
+        Log.d(TAG, "onDestroy called");
+        isRunning = false;
+
+        try {
+            if (overlayView != null && windowManager != null) {
+                windowManager.removeView(overlayView);
+                overlayView = null;
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error removing overlay", e);
         }
+
+        windowManager = null;
     }
 }
