@@ -1,44 +1,28 @@
 package com.gsz.loader;
 
 import android.content.Context;
-import android.content.Intent;
-import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
-import android.content.pm.ResolveInfo;
 import android.util.Log;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.lang.reflect.Method;
 import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.List;
+
+import rikka.shizuku.Shizuku;
 
 public final class ShizukuHelper {
 
     private static final String TAG = "ShizukuHelper";
-    private static Class<?> shizukuClass = null;
     private static boolean isRoot = false;
     private static Boolean rootChecked = null;
 
-    static {
-        try {
-            shizukuClass = Class.forName("rikka.shizuku.Shizuku");
-            Log.d(TAG, "Shizuku class loaded via reflection");
-        } catch (Throwable t) {
-            Log.e(TAG, "Shizuku class not found: " + t.getMessage());
-        }
-    }
-
-    private ShizukuHelper() {
-    }
+    private ShizukuHelper() {}
 
     public static boolean isShizukuAvailable() {
-        if (shizukuClass != null) return true;
         try {
-            shizukuClass = Class.forName("rikka.shizuku.Shizuku");
+            Shizuku.pingBinder();
             return true;
         } catch (Throwable t) {
             return false;
@@ -52,7 +36,6 @@ public final class ShizukuHelper {
             int exit = p.waitFor();
             isRoot = (exit == 0);
             rootChecked = true;
-            Log.d(TAG, "Root check: " + isRoot);
         } catch (Exception e) {
             isRoot = false;
             rootChecked = true;
@@ -62,9 +45,7 @@ public final class ShizukuHelper {
 
     public static boolean isBinderAlive() {
         try {
-            if (shizukuClass == null) return false;
-            Method m = shizukuClass.getMethod("pingBinder");
-            return (boolean) m.invoke(null);
+            return Shizuku.pingBinder();
         } catch (Throwable t) {
             return false;
         }
@@ -72,10 +53,7 @@ public final class ShizukuHelper {
 
     public static boolean hasPermission() {
         try {
-            if (!isBinderAlive()) return false;
-            Method m = shizukuClass.getMethod("checkSelfPermission");
-            int result = (int) m.invoke(null);
-            return result == PackageManager.PERMISSION_GRANTED;
+            return Shizuku.checkSelfPermission() == PackageManager.PERMISSION_GRANTED;
         } catch (Throwable t) {
             return false;
         }
@@ -83,19 +61,10 @@ public final class ShizukuHelper {
 
     public static void requestPermission(int reqCode) {
         try {
-            if (shizukuClass == null) return;
-            Method m = shizukuClass.getMethod("requestPermission", int.class);
-            m.invoke(null, reqCode);
+            Shizuku.requestPermission(reqCode);
         } catch (Throwable t) {
             Log.e(TAG, "requestPermission failed", t);
         }
-    }
-
-    private static Process shizukuNewProcess(String[] cmd) throws Exception {
-        Method m = shizukuClass.getDeclaredMethod(
-                "newProcess", String[].class, String[].class, String.class);
-        m.setAccessible(true);
-        return (Process) m.invoke(null, cmd, null, null);
     }
 
     public static String exec(String command) {
@@ -132,7 +101,7 @@ public final class ShizukuHelper {
         StringBuilder output = new StringBuilder();
         try {
             if (!isBinderAlive() || !hasPermission()) return "ERROR: no shizuku permission";
-            Process p = shizukuNewProcess(new String[]{"sh", "-c", command});
+            Process p = Shizuku.newProcess(new String[]{"sh", "-c", command}, null, null);
             InputStream is = p.getInputStream();
             InputStream es = p.getErrorStream();
             ByteArrayOutputStream bos = new ByteArrayOutputStream();
@@ -175,26 +144,22 @@ public final class ShizukuHelper {
             p.destroy();
             return code == 0;
         } catch (Exception e) {
-            Log.e(TAG, "writeFileRoot failed", e);
             return false;
         }
     }
 
     private static boolean writeFileShizuku(String absPath, String content) {
-        if (!isBinderAlive() || !hasPermission()) {
-            Log.e(TAG, "writeFileShizuku: no shizuku permission");
-            return false;
-        }
+        if (!isBinderAlive() || !hasPermission()) return false;
         try {
             String parent = new File(absPath).getParent();
             if (parent != null) {
-                Process mk = shizukuNewProcess(new String[]{"sh", "-c", "mkdir -p '" + parent + "'"});
+                Process mk = Shizuku.newProcess(new String[]{"sh", "-c", "mkdir -p '" + parent + "'"}, null, null);
                 mk.waitFor();
                 mk.destroy();
             }
-            Process p = shizukuNewProcess(new String[]{
+            Process p = Shizuku.newProcess(new String[]{
                     "sh", "-c", "cat > '" + absPath + "' && chmod 644 '" + absPath + "'"
-            });
+            }, null, null);
             OutputStream os = p.getOutputStream();
             os.write(content.getBytes(StandardCharsets.UTF_8));
             os.flush();
@@ -203,7 +168,6 @@ public final class ShizukuHelper {
             p.destroy();
             return code == 0;
         } catch (Throwable t) {
-            Log.e(TAG, "writeFileShizuku failed", t);
             return false;
         }
     }
@@ -235,8 +199,8 @@ public final class ShizukuHelper {
     private static String readFileShizuku(String absPath) {
         if (!isBinderAlive() || !hasPermission()) return null;
         try {
-            Process p = shizukuNewProcess(
-                    new String[]{"sh", "-c", "cat '" + absPath + "' 2>/dev/null"});
+            Process p = Shizuku.newProcess(
+                    new String[]{"sh", "-c", "cat '" + absPath + "' 2>/dev/null"}, null, null);
             InputStream is = p.getInputStream();
             ByteArrayOutputStream bos = new ByteArrayOutputStream();
             byte[] buf = new byte[8192];
@@ -265,7 +229,6 @@ public final class ShizukuHelper {
             p.destroy();
             return code == 0;
         } catch (Exception e) {
-            Log.e(TAG, "copyFileRoot failed", e);
             return false;
         }
     }
@@ -273,14 +236,13 @@ public final class ShizukuHelper {
     private static boolean copyFileShizuku(String src, String dst) {
         if (!isBinderAlive() || !hasPermission()) return false;
         try {
-            Process p = shizukuNewProcess(new String[]{
+            Process p = Shizuku.newProcess(new String[]{
                     "sh", "-c", "cp '" + src + "' '" + dst + "' && chmod 644 '" + dst + "'"
-            });
+            }, null, null);
             int code = p.waitFor();
             p.destroy();
             return code == 0;
         } catch (Throwable t) {
-            Log.e(TAG, "copyFileShizuku failed", t);
             return false;
         }
     }
@@ -298,7 +260,7 @@ public final class ShizukuHelper {
         }
         if (!isBinderAlive() || !hasPermission()) return false;
         try {
-            Process p = shizukuNewProcess(new String[]{"sh", "-c", "mkdir -p '" + path + "'"});
+            Process p = Shizuku.newProcess(new String[]{"sh", "-c", "mkdir -p '" + path + "'"}, null, null);
             int code = p.waitFor();
             p.destroy();
             return code == 0;
@@ -311,65 +273,20 @@ public final class ShizukuHelper {
         exec("am force-stop " + packageName);
     }
 
-    /**
-     * FIXED: More robust game detection with multiple methods
-     */
     public static String detectInstalledGame(Context ctx) {
         PackageManager pm = ctx.getPackageManager();
-
-        // Method 1: Check known packages directly
-        String[] knownPkgs = {
-                "com.pubg.imobile",
-                "com.tencent.ig",
-                "com.tencent.igfit",
-                "com.pubg.krmobile",
-                "com.vng.pubgmobile",
-                "com.rekoo.pubgm",
-                "com.pubg.mobile",
-                "com.tencent.iglite",
-                "com.pubg.mobilelite",
-                "com.tencent.tmgp.pubgmhd",
-                "com.tencent.tmgp.pubgm",
-                "com.garena.game.kgvn",
-                "com.garena.game.pkgametw",
-                "com.garena.game.pkgame"
+        String[] pkgs = {
+                "com.pubg.imobile", "com.tencent.ig", "com.tencent.igfit",
+                "com.pubg.krmobile", "com.vng.pubgmobile", "com.rekoo.pubgm",
+                "com.pubg.mobile", "com.tencent.iglite", "com.pubg.mobilelite",
+                "com.tencent.tmgp.pubgmhd", "com.tencent.tmgp.pubgm"
         };
-
-        for (String pkg : knownPkgs) {
+        for (String pkg : pkgs) {
             try {
                 pm.getPackageInfo(pkg, 0);
-                Log.d(TAG, "Game found (direct): " + pkg);
                 return pkg;
-            } catch (PackageManager.NameNotFoundException ignored) {
-            }
+            } catch (PackageManager.NameNotFoundException ignored) {}
         }
-
-        // Method 2: Query all installed packages with PUBG-like names
-        try {
-            List<PackageInfo> allPackages = pm.getInstalledPackages(0);
-            for (PackageInfo pi : allPackages) {
-                String name = pi.packageName.toLowerCase();
-                if (name.contains("pubg") || name.contains("tencent.ig") ||
-                    name.contains("shadowtracker") || name.contains("battleground")) {
-                    Log.d(TAG, "Game found (scan): " + pi.packageName);
-                    return pi.packageName;
-                }
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Package scan failed: " + e.getMessage());
-        }
-
-        // Method 3: Check launch intents
-        try {
-            Intent launchIntent = pm.getLaunchIntentForPackage("com.tencent.ig");
-            if (launchIntent != null) return "com.tencent.ig";
-
-            launchIntent = pm.getLaunchIntentForPackage("com.pubg.imobile");
-            if (launchIntent != null) return "com.pubg.imobile";
-        } catch (Exception ignored) {
-        }
-
-        Log.e(TAG, "No game package detected!");
         return null;
     }
 
