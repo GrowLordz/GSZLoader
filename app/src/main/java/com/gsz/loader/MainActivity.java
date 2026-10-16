@@ -21,23 +21,6 @@ public class MainActivity extends AppCompatActivity {
 
     private static final String TAG = "MainActivity";
     
-    private final Shizuku.OnRequestPermissionResultListener permListener = (requestCode, grantResult) -> {
-        if (requestCode == REQ_PERMISSION) {
-            runOnUiThread(() -> {
-                if (grantResult == PackageManager.PERMISSION_GRANTED) {
-                    tvAccessMode.setText("Access: SHIZUKU");
-                    tvAccessMode.setTextColor(0xFF4CAF50);
-                    tvStatus.setText("Shizuku connected");
-                    tvStatus.setTextColor(0xFF4CAF50);
-                    Toast.makeText(this, "Shizuku permission granted!", Toast.LENGTH_SHORT).show();
-                } else {
-                    tvStatus.setText("Shizuku permission denied");
-                    tvStatus.setTextColor(0xFFF44336);
-                    showPermissionDeniedDialog();
-                }
-            });
-        }
-    };
     private static final int REQ_PERMISSION = 1001;
     private static final int REQ_OVERLAY = 1002;
 
@@ -55,6 +38,24 @@ public class MainActivity extends AppCompatActivity {
         config = new ConfigManager(this);
         handler = new Handler(Looper.getMainLooper());
 
+        // Initialize Shizuku permission listener
+        permListener = (requestCode, grantResult) -> {
+            if (requestCode == REQ_PERMISSION) {
+                runOnUiThread(() -> {
+                    if (grantResult == PackageManager.PERMISSION_GRANTED) {
+                        tvAccessMode.setText("Access: SHIZUKU");
+                        tvAccessMode.setTextColor(0xFF4CAF50);
+                        tvStatus.setText("Shizuku connected");
+                        tvStatus.setTextColor(0xFF4CAF50);
+                        Toast.makeText(this, "Shizuku permission granted!", Toast.LENGTH_SHORT).show();
+                    } else {
+                        tvStatus.setText("Shizuku permission denied");
+                        tvStatus.setTextColor(0xFFF44336);
+                        showPermissionDeniedDialog();
+                    }
+                });
+            }
+        };
         // Register Shizuku permission listener
         Shizuku.addRequestPermissionResultListener(permListener);
 
@@ -343,7 +344,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        Shizuku.removeRequestPermissionResultListener(permListener);
+        if (permListener != null) { Shizuku.removeRequestPermissionResultListener(permListener); }
         Log.d(TAG, "MainActivity destroyed");
     }
 }
