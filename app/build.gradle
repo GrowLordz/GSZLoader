@@ -1,0 +1,40 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.gsz.loader'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.gsz.loader"
+        minSdk 24
+        targetSdk 34
+        versionCode 1
+        versionName "1.0"
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            shrinkResources false
+        }
+        debug {
+            minifyEnabled false
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    lintOptions {
+        disable 'MissingTranslation', 'ExtraTranslation'
+        abortOnError false
+    }
+}
+
+dependencies {
+    // no external dependencies - pure android framework
+}

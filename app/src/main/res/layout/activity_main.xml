@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:padding="24dp"
+    android:background="#0D0D1A">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="GSZ LOADER"
+        android:textSize="32sp"
+        android:textStyle="bold"
+        android:textColor="#00D4AA"
+        android:layout_marginBottom="4dp"/>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="PUBG Mod Loader v2.0"
+        android:textSize="13sp"
+        android:textColor="#666677"
+        android:layout_marginBottom="24dp"/>
+
+    <TextView
+        android:id="@+id/tvGamePkg"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Game: detecting..."
+        android:textSize="13sp"
+        android:textColor="#888899"
+        android:layout_marginBottom="4dp"/>
+
+    <TextView
+        android:id="@+id/tvAccessMode"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Access: checking..."
+        android:textSize="13sp"
+        android:textColor="#888899"
+        android:layout_marginBottom="4dp"/>
+
+    <TextView
+        android:id="@+id/tvStatus"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Status: initializing..."
+        android:textSize="13sp"
+        android:textColor="#FF9800"
+        android:layout_marginBottom="20dp"/>
+
+    <ProgressBar
+        android:id="@+id/progressBar"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:visibility="gone"
+        android:layout_marginBottom="16dp"/>
+
+    <Button
+        android:id="@+id/btnCheckAccess"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="CHECK ACCESS"
+        android:textColor="#FFFFFF"
+        android:background="@drawable/bg_button_secondary"
+        android:layout_marginBottom="10dp"/>
+
+    <Button
+        android:id="@+id/btnCopyPaks"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="COPY PAKS TO GAME"
+        android:textColor="#FFFFFF"
+        android:background="@drawable/bg_button"
+        android:layout_marginBottom="10dp"/>
+
+    <Button
+        android:id="@+id/btnLaunchGame"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="LAUNCH GAME"
+        android:textColor="#FFFFFF"
+        android:background="@drawable/bg_button"
+        android:layout_marginBottom="10dp"/>
+
+    <Button
+        android:id="@+id/btnKillGame"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="KILL GAME"
+        android:textColor="#FFFFFF"
+        android:background="@drawable/bg_button_danger"
+        android:layout_marginBottom="10dp"/>
+
+    <Button
+        android:id="@+id/btnStartMenu"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="START FLOATING MENU"
+        android:textColor="#FFFFFF"
+        android:background="@drawable/bg_button_accent"/>
+
+</LinearLayout>
