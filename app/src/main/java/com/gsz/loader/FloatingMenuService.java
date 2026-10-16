@@ -4,6 +4,7 @@ import android.animation.AnimatorSet;
 import android.animation.ObjectAnimator;
 import androidx.core.app.NotificationCompat;
 import android.app.Notification;
+import androidx.core.app.NotificationCompat;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
@@ -88,7 +89,7 @@ public class FloatingMenuService extends Service {
                     this, 0, intent,
                     PendingIntent.FLAG_IMMUTABLE | PendingIntent.FLAG_UPDATE_CURRENT);
 
-            Notification.Builder builder;
+            NotificationCompat.Builder builder;
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 builder = new NotificationCompat.Builder(this, CHANNEL_ID);
             } else {

@@ -12,11 +12,23 @@ import java.nio.charset.StandardCharsets;
 
 import rikka.shizuku.Shizuku;
 
+import java.lang.reflect.Method;
+
 public final class ShizukuHelper {
 
     private static final String TAG = "ShizukuHelper";
     private static boolean isRoot = false;
     private static Boolean rootChecked = null;
+
+    private static Process newProcessCompat(String[] cmd) throws Exception {
+        try {
+            Method m = Shizuku.class.getDeclaredMethod("newProcess", String[].class, String[].class, String.class);
+            m.setAccessible(true);
+            return (Process) m.invoke(null, cmd, null, null);
+        } catch (NoSuchMethodException e) {
+            return new ProcessBuilder(cmd).redirectErrorStream(true).start();
+        }
+    }
 
     private ShizukuHelper() {}
 
@@ -101,7 +113,7 @@ public final class ShizukuHelper {
         StringBuilder output = new StringBuilder();
         try {
             if (!isBinderAlive() || !hasPermission()) return "ERROR: no shizuku permission";
-            Process p = Shizuku.newProcess(new String[]{"sh", "-c", command}, null, null);
+            Process p = newProcessCompat(new String[]{"sh", "-c", command}, null, null);
             InputStream is = p.getInputStream();
             InputStream es = p.getErrorStream();
             ByteArrayOutputStream bos = new ByteArrayOutputStream();
@@ -153,11 +165,11 @@ public final class ShizukuHelper {
         try {
             String parent = new File(absPath).getParent();
             if (parent != null) {
-                Process mk = Shizuku.newProcess(new String[]{"sh", "-c", "mkdir -p '" + parent + "'"}, null, null);
+                Process mk = newProcessCompat(new String[]{"sh", "-c", "mkdir -p '" + parent + "'"}, null, null);
                 mk.waitFor();
                 mk.destroy();
             }
-            Process p = Shizuku.newProcess(new String[]{
+            Process p = newProcessCompat(new String[]{
                     "sh", "-c", "cat > '" + absPath + "' && chmod 644 '" + absPath + "'"
             }, null, null);
             OutputStream os = p.getOutputStream();
@@ -199,7 +211,7 @@ public final class ShizukuHelper {
     private static String readFileShizuku(String absPath) {
         if (!isBinderAlive() || !hasPermission()) return null;
         try {
-            Process p = Shizuku.newProcess(
+            Process p = newProcessCompat(
                     new String[]{"sh", "-c", "cat '" + absPath + "' 2>/dev/null"}, null, null);
             InputStream is = p.getInputStream();
             ByteArrayOutputStream bos = new ByteArrayOutputStream();
@@ -236,7 +248,7 @@ public final class ShizukuHelper {
     private static boolean copyFileShizuku(String src, String dst) {
         if (!isBinderAlive() || !hasPermission()) return false;
         try {
-            Process p = Shizuku.newProcess(new String[]{
+            Process p = newProcessCompat(new String[]{
                     "sh", "-c", "cp '" + src + "' '" + dst + "' && chmod 644 '" + dst + "'"
             }, null, null);
             int code = p.waitFor();
@@ -260,7 +272,7 @@ public final class ShizukuHelper {
         }
         if (!isBinderAlive() || !hasPermission()) return false;
         try {
-            Process p = Shizuku.newProcess(new String[]{"sh", "-c", "mkdir -p '" + path + "'"}, null, null);
+            Process p = newProcessCompat(new String[]{"sh", "-c", "mkdir -p '" + path + "'"}, null, null);
             int code = p.waitFor();
             p.destroy();
             return code == 0;
